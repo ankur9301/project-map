@@ -55,6 +55,7 @@ class ApartmentRead(ApartmentBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    user_id: str
     latitude: float | None = None
     longitude: float | None = None
     commute_score: float | None = None

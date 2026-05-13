@@ -9,9 +9,9 @@ def _commute_map(apartment: Apartment) -> dict:
     return {commute.direction: commute for commute in apartment.commutes}
 
 
-def build_excel(db: Session) -> BytesIO:
+def build_excel(db: Session, user_id: str) -> BytesIO:
     rows = []
-    apartments = db.query(Apartment).order_by(Apartment.created_at.desc()).all()
+    apartments = db.query(Apartment).filter(Apartment.user_id == user_id).order_by(Apartment.created_at.desc()).all()
     for apartment in apartments:
         commutes = _commute_map(apartment)
         morning = commutes.get("morning")

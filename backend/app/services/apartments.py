@@ -20,13 +20,13 @@ def _upsert_commute(db: Session, apartment: Apartment, direction: str, data: dic
         setattr(commute, key, value)
 
 
-def _current_target(db: Session) -> TargetLocation:
-    target = db.get(TargetLocation, 1)
+def _current_target(db: Session, user_id: str) -> TargetLocation:
+    target = db.query(TargetLocation).filter(TargetLocation.user_id == user_id).first()
     if target:
         return target
     settings = get_settings()
     target = TargetLocation(
-        id=1,
+        user_id=user_id,
         label="Office",
         address=settings.bloomberg_address,
         latitude=settings.bloomberg_lat,
@@ -38,8 +38,15 @@ def _current_target(db: Session) -> TargetLocation:
     return target
 
 
-async def create_apartment(db: Session, payload: ApartmentCreate) -> Apartment:
-    apartment = Apartment(**payload.model_dump())
+async def create_apartment(db: Session, payload: ApartmentCreate, user_id: str) -> Apartment:
+    existing = db.query(Apartment).filter(Apartment.user_id == user_id, Apartment.address == payload.address).first()
+    if existing:
+        for key, value in payload.model_dump().items():
+            if value is not None:
+                setattr(existing, key, value)
+        return await recalculate_apartment(db, existing)
+
+    apartment = Apartment(**payload.model_dump(), user_id=user_id)
     db.add(apartment)
     try:
         db.commit()
@@ -52,7 +59,7 @@ async def create_apartment(db: Session, payload: ApartmentCreate) -> Apartment:
         lat, lon = await geocode_address(db, apartment.address)
         apartment.latitude = lat
         apartment.longitude = lon
-        target = _current_target(db)
+        target = _current_target(db, user_id)
         commute_data = await calculate_both_commutes_to_target(lat, lon, target.latitude, target.longitude)
         for direction, data in commute_data.items():
             _upsert_commute(db, apartment, direction, data)
@@ -75,7 +82,7 @@ async def recalculate_apartment(db: Session, apartment: Apartment) -> Apartment:
         lat, lon = await geocode_address(db, apartment.address)
         apartment.latitude = lat
         apartment.longitude = lon
-    target = _current_target(db)
+    target = _current_target(db, apartment.user_id)
     commute_data = await calculate_both_commutes_to_target(lat, lon, target.latitude, target.longitude)
     for direction, data in commute_data.items():
         _upsert_commute(db, apartment, direction, data)

@@ -58,6 +58,13 @@ function walkLabel(minutes) {
   return minutes === 1 ? "1 min walking" : `${minutes} min walking`;
 }
 
+function burdenLevel(value, good, ok) {
+  if (!Number.isFinite(value)) return "Unknown";
+  if (value <= good) return "Easy";
+  if (value <= ok) return "Manageable";
+  return "Heavy";
+}
+
 function routeSteps(steps = "") {
   return steps
     .split(/\s+\|\s+/)
@@ -185,6 +192,12 @@ export default function ApartmentCards({ apartments, bestId, cheapestId, onToggl
         const lines = [morning.lines, evening.lines].filter(Boolean).join(" / ");
         const features = featureParts(apartment.features);
         const heroFeatures = features.chips.slice(0, 3);
+        const dailyTransfers = Number.isFinite(morning.transfers) && Number.isFinite(evening.transfers)
+          ? morning.transfers + evening.transfers
+          : null;
+        const dailyWalk = Number.isFinite(morning.walking_minutes) && Number.isFinite(evening.walking_minutes)
+          ? morning.walking_minutes + evening.walking_minutes
+          : null;
         return (
           <article className="apartmentCard" key={apartment.id}>
             <div className="listingRibbon">
@@ -265,6 +278,11 @@ export default function ApartmentCards({ apartments, bestId, cheapestId, onToggl
             )}
             <details className="cardDrawer">
               <summary><MoreHorizontal size={17} />Details</summary>
+              <div className="decisionSignals">
+                <span><strong>{burdenLevel(trip, 70, 95)}</strong> round trip</span>
+                <span><strong>{burdenLevel(dailyTransfers, 2, 4)}</strong> transfers</span>
+                <span><strong>{burdenLevel(dailyWalk, 18, 32)}</strong> walking</span>
+              </div>
               {(apartment.agent_name || apartment.agent_phone || apartment.agent_broker) && (
                 <div className="agentStrip">
                   <strong>{apartment.agent_name || "N/A"}</strong>

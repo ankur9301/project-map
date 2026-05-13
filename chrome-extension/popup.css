@@ -105,6 +105,14 @@ button:disabled {
   opacity: 0.45;
 }
 
+.secondary {
+  width: 100%;
+  margin-top: 8px;
+  background: white;
+  color: #14202e;
+  border: 1px solid rgba(30, 46, 64, 0.14);
+}
+
 .status {
   min-height: 18px;
   margin-top: 10px;

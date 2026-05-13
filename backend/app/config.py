@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     evening_departure_time: str = "17:30:00"
     routing_provider: str = "otp"
     google_maps_api_key: str | None = None
+    supabase_url: str | None = None
+    supabase_anon_key: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

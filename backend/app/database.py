@@ -38,6 +38,7 @@ def _ensure_sqlite_columns() -> None:
         return
     existing = {column["name"] for column in inspector.get_columns("apartments")}
     additions = {
+        "user_id": "VARCHAR(80) NOT NULL DEFAULT 'local'",
         "agent_name": "VARCHAR(300)",
         "agent_phone": "VARCHAR(80)",
         "agent_broker": "VARCHAR(300)",
@@ -48,6 +49,11 @@ def _ensure_sqlite_columns() -> None:
         for column, column_type in additions.items():
             if column not in existing:
                 connection.execute(text(f"ALTER TABLE apartments ADD COLUMN {column} {column_type}"))
+    if "target_location" in inspector.get_table_names():
+        target_existing = {column["name"] for column in inspector.get_columns("target_location")}
+        if "user_id" not in target_existing:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE target_location ADD COLUMN user_id VARCHAR(80) NOT NULL DEFAULT 'local'"))
     if "commutes" in inspector.get_table_names():
         commute_existing = {column["name"] for column in inspector.get_columns("commutes")}
         if "total_distance_km" not in commute_existing:

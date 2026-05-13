@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Apartment Capture</title>
+    <title>CommuteRank Capture</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
     <main>
-      <p class="eyebrow">Local tracker</p>
-      <h1>Save this listing</h1>
-      <p class="muted">Reads only the current tab after you click. No crawling, no cookies, no passwords.</p>
+      <p class="eyebrow">CommuteRank</p>
+      <h1>Analyze apartment</h1>
+      <p class="muted">Saves visible listing facts only after you click. No crawling, no cookies, no passwords.</p>
 
       <section id="preview" class="preview">
         <span>Open a listing page, then click Capture.</span>
@@ -21,10 +21,16 @@
         <input id="apiBase" value="http://127.0.0.1:8000" />
       </label>
 
+      <label>
+        Website auth token
+        <input id="authToken" placeholder="Paste token from website once" />
+      </label>
+
       <div class="actions">
         <button id="capture">Capture</button>
         <button id="save" disabled>Save</button>
       </div>
+      <button id="connect" class="secondary">Connect from website tab</button>
 
       <p id="status" class="status"></p>
     </main>

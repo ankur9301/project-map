@@ -7,9 +7,11 @@ from .database import Base
 
 class Apartment(Base):
     __tablename__ = "apartments"
+    __table_args__ = (UniqueConstraint("user_id", "address", name="uq_apartment_user_address"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    address: Mapped[str] = mapped_column(String(500), nullable=False, unique=True, index=True)
+    user_id: Mapped[str] = mapped_column(String(80), nullable=False, default="local", index=True)
+    address: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
     price: Mapped[float | None] = mapped_column(Float, nullable=True)
     features: Mapped[str | None] = mapped_column(Text, nullable=True)
     bed: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -70,7 +72,8 @@ class GeocodeCache(Base):
 class TargetLocation(Base):
     __tablename__ = "target_location"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(80), nullable=False, default="local", unique=True, index=True)
     label: Mapped[str] = mapped_column(String(200), nullable=False, default="Office")
     address: Mapped[str] = mapped_column(String(500), nullable=False)
     latitude: Mapped[float] = mapped_column(Float, nullable=False)

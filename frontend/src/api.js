@@ -1,8 +1,18 @@
+import { supabase } from "./supabaseClient";
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
+async function authHeaders() {
+  if (!supabase) return {};
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function request(path, options = {}) {
+  const authorization = await authHeaders();
   const response = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    headers: { "Content-Type": "application/json", ...authorization, ...(options.headers || {}) },
     ...options,
   });
   if (!response.ok) {
@@ -53,4 +63,19 @@ export function saveTarget(payload, recalculate = true) {
 
 export function exportUrl() {
   return `${API_BASE}/export`;
+}
+
+export async function downloadExport() {
+  const authorization = await authHeaders();
+  const response = await fetch(`${API_BASE}/export`, { headers: authorization });
+  if (!response.ok) throw new Error(`Export failed with ${response.status}`);
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "apartment_commutes.xlsx";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }

@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Download, EyeOff, LayoutGrid, MapPin, Moon, Plus, Search, SlidersHorizontal, Sun, Trash2 } from "lucide-react";
-import { addApartment, deleteApartment, exportUrl, getApartments, getTarget, recalculateApartment, saveTarget, updateApartment } from "./api";
+import { addApartment, deleteApartment, downloadExport, getApartments, getTarget, recalculateApartment, saveTarget, updateApartment } from "./api";
 import ApartmentCards from "./components/ApartmentCards";
 import ApartmentTable from "./components/ApartmentTable";
 import AddApartmentModal, { initialForm } from "./components/AddApartmentModal";
 import MapPanel from "./components/MapPanel";
+import { supabase } from "./supabaseClient";
 import { getCommute, roundTrip } from "./utils";
 import "./styles.css";
 
@@ -104,6 +105,26 @@ export default function App() {
 
   useEffect(() => {
     loadTarget();
+  }, []);
+
+  useEffect(() => {
+    if (!supabase) return undefined;
+    let channel;
+    supabase.auth.getUser().then(({ data }) => {
+      const userId = data.user?.id;
+      if (!userId) return;
+      channel = supabase
+        .channel(`apartments-${userId}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "apartments", filter: `user_id=eq.${userId}` },
+          () => load()
+        )
+        .subscribe();
+    });
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
   }, []);
 
   async function handleSubmit(event) {
@@ -270,7 +291,7 @@ export default function App() {
           <button className="iconButton" type="button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle theme">
             {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-          <a className="ghostButton" href={exportUrl()}><Download size={16} />Export Excel</a>
+          <button className="ghostButton" type="button" onClick={() => downloadExport().catch((error) => setToast(error.message))}><Download size={16} />Export Excel</button>
           <button className="primaryButton" type="button" onClick={() => setModalOpen(true)}><Plus size={16} />Add apartment</button>
         </div>
       </header>

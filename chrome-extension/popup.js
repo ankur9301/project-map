@@ -4,13 +4,19 @@ const preview = document.getElementById("preview");
 const statusEl = document.getElementById("status");
 const saveButton = document.getElementById("save");
 const apiBaseInput = document.getElementById("apiBase");
+const authTokenInput = document.getElementById("authToken");
 
-chrome.storage.local.get(["apiBase"], (data) => {
+chrome.storage.local.get(["apiBase", "authToken"], (data) => {
   if (data.apiBase) apiBaseInput.value = data.apiBase;
+  if (data.authToken) authTokenInput.value = data.authToken;
 });
 
 apiBaseInput.addEventListener("change", () => {
   chrome.storage.local.set({ apiBase: apiBaseInput.value.trim() });
+});
+
+authTokenInput.addEventListener("change", () => {
+  chrome.storage.local.set({ authToken: authTokenInput.value.trim() });
 });
 
 document.getElementById("capture").addEventListener("click", async () => {
@@ -31,22 +37,47 @@ document.getElementById("capture").addEventListener("click", async () => {
   }
 });
 
+document.getElementById("connect").addEventListener("click", async () => {
+  status("Reading login from current website tab...");
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const url = tab.url || "";
+    if (!/^https?:\/\/(localhost|127\.0\.0\.1):5173\//.test(url)) {
+      throw new Error("Open the website dashboard tab first, then click this button.");
+    }
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: readSupabaseTokenFromPage,
+    });
+    if (!result) throw new Error("No website login found. Sign into the website first.");
+    authTokenInput.value = result;
+    chrome.storage.local.set({ authToken: result });
+    status("Website login connected.");
+  } catch (error) {
+    status(error.message || "Could not connect website login.");
+  }
+});
+
 saveButton.addEventListener("click", async () => {
   if (!captured?.address) return;
   const apiBase = apiBaseInput.value.trim().replace(/\/$/, "");
-  chrome.storage.local.set({ apiBase });
-  status("Saving to local tracker...");
+  const authToken = authTokenInput.value.trim();
+  chrome.storage.local.set({ apiBase, authToken });
+  status("Sending to your decision workspace...");
   try {
     const response = await fetch(`${apiBase}/apartments`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      },
       body: JSON.stringify(captured),
     });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
       throw new Error(body.detail || `Save failed: ${response.status}`);
     }
-    status("Saved. Open the tracker to see commute status.");
+    status("Saved. Open the dashboard to compare and rank it.");
     saveButton.disabled = true;
   } catch (error) {
     status(error.message || "Save failed.");
@@ -114,6 +145,20 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function readSupabaseTokenFromPage() {
+  for (const key of Object.keys(localStorage)) {
+    if (!key.startsWith("sb-") || !key.endsWith("-auth-token")) continue;
+    try {
+      const value = JSON.parse(localStorage.getItem(key) || "null");
+      const token = value?.access_token || value?.currentSession?.access_token;
+      if (token) return token;
+    } catch {
+      // Keep looking.
+    }
+  }
+  return null;
 }
 
 function extractListingFromPage() {

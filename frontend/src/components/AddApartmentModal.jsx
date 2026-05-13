@@ -1,5 +1,5 @@
 import React from "react";
-import { X } from "lucide-react";
+import { Link, MapPin, X } from "lucide-react";
 
 const initialForm = {
   address: "",
@@ -23,22 +23,45 @@ export default function AddApartmentModal({ open, form, setForm, loading, onClos
   if (!open) return null;
 
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+  const updateUrl = (value) => {
+    let source = form.source;
+    try {
+      source = new URL(value).hostname.replace(/^www\./, "");
+    } catch {
+      source = form.source;
+    }
+    setForm((current) => ({ ...current, listing_url: value, source }));
+  };
 
   return (
     <div className="modalLayer" role="presentation">
       <form className="modal" onSubmit={onSubmit}>
         <div className="modalHeader">
           <div>
-            <p className="eyebrow">New apartment</p>
-            <h2>Add a listing</h2>
+            <p className="eyebrow">Hybrid input</p>
+            <h2>Add to decision workspace</h2>
           </div>
           <button className="iconButton" type="button" onClick={onClose} aria-label="Close">
             <X size={18} />
           </button>
         </div>
 
+        <section className="inputModePanel">
+          <div>
+            <Link size={18} />
+            <div>
+              <strong>Paste listing URL</strong>
+              <span>Best for quick saving from mobile or when the extension is not installed.</span>
+            </div>
+          </div>
+          <label className="field wide">
+            <span>Listing URL</span>
+            <input value={form.listing_url} onChange={(event) => updateUrl(event.target.value)} placeholder="https://www.zillow.com/..." />
+          </label>
+        </section>
+
         <label className="field wide">
-          <span>Address</span>
+          <span><MapPin size={14} />Address</span>
           <input value={form.address} onChange={(event) => update("address", event.target.value)} required placeholder="123 Main St, Hoboken, NJ" />
         </label>
 
@@ -84,8 +107,8 @@ export default function AddApartmentModal({ open, form, setForm, loading, onClos
           </label>
         </div>
         <label className="field wide">
-          <span>Listing URL</span>
-          <input value={form.listing_url} onChange={(event) => update("listing_url", event.target.value)} placeholder="https://..." />
+          <span>Source</span>
+          <input value={form.source} onChange={(event) => update("source", event.target.value)} placeholder="zillow.com, streeteasy.com, apartments.com..." />
         </label>
         <label className="check">
           <input type="checkbox" checked={form.favorite} onChange={(event) => update("favorite", event.target.checked)} />

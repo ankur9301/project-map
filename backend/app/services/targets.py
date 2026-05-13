@@ -7,14 +7,14 @@ from .apartments import recalculate_apartment
 from .geocoder import geocode_address
 
 
-def get_target(db: Session) -> TargetLocation:
-    target = db.get(TargetLocation, 1)
+def get_target(db: Session, user_id: str) -> TargetLocation:
+    target = db.query(TargetLocation).filter(TargetLocation.user_id == user_id).first()
     if target:
         return target
 
     settings = get_settings()
     target = TargetLocation(
-        id=1,
+        user_id=user_id,
         label="Office",
         address=settings.bloomberg_address,
         latitude=settings.bloomberg_lat,
@@ -26,8 +26,8 @@ def get_target(db: Session) -> TargetLocation:
     return target
 
 
-async def update_target(db: Session, payload: TargetLocationUpdate, recalculate: bool = True) -> TargetLocation:
-    target = get_target(db)
+async def update_target(db: Session, payload: TargetLocationUpdate, user_id: str, recalculate: bool = True) -> TargetLocation:
+    target = get_target(db, user_id)
     lat, lon = await geocode_address(db, payload.address)
     target.label = payload.label or "Office"
     target.address = payload.address
@@ -37,7 +37,7 @@ async def update_target(db: Session, payload: TargetLocationUpdate, recalculate:
     db.refresh(target)
 
     if recalculate:
-        apartments = db.query(Apartment).all()
+        apartments = db.query(Apartment).filter(Apartment.user_id == user_id).all()
         for apartment in apartments:
             await recalculate_apartment(db, apartment)
         db.refresh(target)
