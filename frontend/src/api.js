@@ -1,0 +1,56 @@
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+
+async function request(path, options = {}) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    ...options,
+  });
+  if (!response.ok) {
+    let detail = `Request failed with ${response.status}`;
+    try {
+      const body = await response.json();
+      detail = body.detail || detail;
+    } catch {
+      detail = response.statusText || detail;
+    }
+    throw new Error(detail);
+  }
+  if (response.status === 204) return null;
+  return response.json();
+}
+
+export function getApartments(params = {}) {
+  const query = new URLSearchParams();
+  if (params.search) query.set("search", params.search);
+  if (params.favorite !== undefined) query.set("favorite", params.favorite);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request(`/apartments${suffix}`);
+}
+
+export function addApartment(payload) {
+  return request("/apartments", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function updateApartment(id, payload) {
+  return request(`/apartments/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function recalculateApartment(id) {
+  return request(`/apartments/${id}/recalculate`, { method: "POST" });
+}
+
+export function deleteApartment(id) {
+  return request(`/apartments/${id}`, { method: "DELETE" });
+}
+
+export function getTarget() {
+  return request("/target");
+}
+
+export function saveTarget(payload, recalculate = true) {
+  return request(`/target?recalculate=${recalculate}`, { method: "PUT", body: JSON.stringify(payload) });
+}
+
+export function exportUrl() {
+  return `${API_BASE}/export`;
+}

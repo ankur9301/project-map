@@ -1,0 +1,38 @@
+services:
+  otp:
+    image: opentripplanner/opentripplanner:2.6.0
+    container_name: apartment-otp
+    command: --load --serve
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./otp-data:/var/opentripplanner
+
+  backend:
+    build:
+      context: ./backend
+    container_name: apartment-backend
+    environment:
+      DATABASE_URL: sqlite:////data/apartments.db
+      OTP_BASE_URL: http://otp:8080/otp
+      NOMINATIM_USER_AGENT: apartment-commute-tracker/1.0 local
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend-data:/data
+    depends_on:
+      - otp
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: apartment-frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  backend-data:

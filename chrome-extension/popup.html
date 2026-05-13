@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Apartment Capture</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Local tracker</p>
+      <h1>Save this listing</h1>
+      <p class="muted">Reads only the current tab after you click. No crawling, no cookies, no passwords.</p>
+
+      <section id="preview" class="preview">
+        <span>Open a listing page, then click Capture.</span>
+      </section>
+
+      <label>
+        API URL
+        <input id="apiBase" value="http://127.0.0.1:8000" />
+      </label>
+
+      <div class="actions">
+        <button id="capture">Capture</button>
+        <button id="save" disabled>Save</button>
+      </div>
+
+      <p id="status" class="status"></p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

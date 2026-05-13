@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Commute Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap" />
+    <style>
+      #boot-fallback {
+        min-height: 100vh;
+        background: #F1ECDF;
+        color: #0E0F12;
+        font-family: "Inter Tight", system-ui, sans-serif;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+      #boot-fallback .card {
+        max-width: 640px;
+        border: 1px solid #E5DFD0;
+        background: #ffffff;
+        border-radius: 18px;
+        padding: 28px;
+        box-shadow: 0 24px 60px -28px rgba(14, 15, 18, 0.18);
+      }
+      #boot-fallback .kicker {
+        margin: 0 0 14px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.7rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #6B6862;
+      }
+      #boot-fallback h1 {
+        margin: 0;
+        font-family: "Instrument Serif", Georgia, serif;
+        font-size: 48px;
+        font-weight: 400;
+        letter-spacing: -0.02em;
+        line-height: 0.95;
+      }
+      #boot-fallback p.body {
+        margin: 14px 0 0;
+        color: #6B6862;
+        line-height: 1.55;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div id="boot-fallback">
+        <div class="card">
+          <p class="kicker">Booting</p>
+          <h1>Commute tracker is loading</h1>
+          <p class="body">If this message stays here, open the browser console and check for a React runtime error.</p>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
