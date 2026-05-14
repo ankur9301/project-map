@@ -17,8 +17,8 @@ export function minutesLabel(minutes) {
 }
 
 export function priceLabel(price) {
-  if (!Number.isFinite(price)) return "-";
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(price);
+  if (!Number.isFinite(Number(price))) return "-";
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(price));
 }
 
 export function commuteTone(minutes) {
@@ -37,4 +37,41 @@ export function distanceLabel(km) {
   if (!Number.isFinite(km)) return "-";
   const miles = km * 0.621371;
   return `${miles.toFixed(1)} mi`;
+}
+
+// ---- Score helpers (v2 decision intelligence) -----------------------------
+export function scoreNumber(score) {
+  if (score === null || score === undefined) return null;
+  const value = Number(score);
+  return Number.isFinite(value) ? value : null;
+}
+
+export function overallTone(score) {
+  const value = scoreNumber(score);
+  if (value === null) return "pending";
+  if (value >= 80) return "excellent";
+  if (value >= 65) return "great";
+  if (value >= 50) return "ok";
+  return "rough";
+}
+
+export function subScoreTone(score) {
+  const value = scoreNumber(score);
+  if (value === null) return "pending";
+  if (value >= 8) return "excellent";
+  if (value >= 6.5) return "great";
+  if (value >= 4.5) return "ok";
+  return "rough";
+}
+
+export function overallScoreLabel(score) {
+  const value = scoreNumber(score);
+  if (value === null) return "—";
+  return value.toFixed(0);
+}
+
+export function subScoreLabel(score) {
+  const value = scoreNumber(score);
+  if (value === null) return "—";
+  return value.toFixed(1);
 }

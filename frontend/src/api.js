@@ -33,6 +33,7 @@ export function getApartments(params = {}) {
   const query = new URLSearchParams();
   if (params.search) query.set("search", params.search);
   if (params.favorite !== undefined) query.set("favorite", params.favorite);
+  if (params.sort) query.set("sort", params.sort);
   const suffix = query.toString() ? `?${query.toString()}` : "";
   return request(`/apartments${suffix}`);
 }
@@ -47,6 +48,10 @@ export function updateApartment(id, payload) {
 
 export function recalculateApartment(id) {
   return request(`/apartments/${id}/recalculate`, { method: "POST" });
+}
+
+export function getApartmentScores(id) {
+  return request(`/apartments/${id}/scores`);
 }
 
 export function deleteApartment(id) {

@@ -98,14 +98,19 @@ function renderPreview(data) {
 }
 
 function normalizePayload(data) {
+  const features = clean(data.features);
+  const notes = [clean(data.notes), features ? `Captured features: ${features}` : null].filter(Boolean).join("\n\n") || null;
   return {
     address: clean(data.address),
     price: toNumber(data.price),
-    features: clean(data.features),
-    bed: toNumber(data.bed),
-    bath: toNumber(data.bath),
+    beds: toNumber(data.beds ?? data.bed),
+    baths: toNumber(data.baths ?? data.bath),
+    sqft: toNumber(data.sqft),
+    building_has_gym: /(^|\b)(gym|fitness center|fitness room)(\b|$)/i.test(features || ""),
+    pet_friendly: /(^|\b)(pet friendly|pets allowed|dogs allowed|cats allowed)(\b|$)/i.test(features || ""),
+    image_url: clean(data.image_url),
     vibe: clean(data.vibe),
-    notes: clean(data.notes),
+    notes,
     agent_name: clean(data.agent_name) || "N/A",
     agent_phone: clean(data.agent_phone) || "N/A",
     agent_broker: clean(data.agent_broker) || "N/A",
@@ -135,7 +140,7 @@ function formatPrice(value) {
 }
 
 function formatBedsBaths(data) {
-  return `${data.bed ?? "-"} bed / ${data.bath ?? "-"} bath`;
+  return `${data.beds ?? data.bed ?? "-"} bed / ${data.baths ?? data.bath ?? "-"} bath`;
 }
 
 function escapeHtml(value) {
@@ -186,14 +191,16 @@ function extractListingFromPage() {
   return {
     address: visible.address || structured.address || findAddress(allText, title),
     price: visible.price || structured.price || matchFirst(allText, [/\$[\d,]+(?:\s*\/\s*mo)?/i]),
-    bed: visible.bed ?? structured.bed ?? matchNumber(allText, [/(\d+(?:\.\d+)?)[\s\n]*(?:bd|bed|beds|bedroom|bedrooms)\b/i]),
-    bath: visible.bath ?? structured.bath ?? matchNumber(allText, [/(\d+(?:\.\d+)?)[\s\n]*(?:ba|bath|baths|bathroom|bathrooms)\b/i]),
+    beds: visible.beds ?? structured.beds ?? matchNumber(allText, [/(\d+(?:\.\d+)?)[\s\n]*(?:bd|bed|beds|bedroom|bedrooms)\b/i]),
+    baths: visible.baths ?? structured.baths ?? matchNumber(allText, [/(\d+(?:\.\d+)?)[\s\n]*(?:ba|bath|baths|bathroom|bathrooms)\b/i]),
+    sqft: visible.sqft ?? structured.sqft ?? matchNumber(allText, [/([\d,]+)[\s\n]*(?:sqft|sq\.?\s*ft\.?|square feet)\b/i]),
     features: visible.features || findFeatures(allText),
     vibe: null,
     notes: visible.notes || `Captured from ${source}`,
     agent_name: visible.agent_name || structured.agent_name || findAgentName(allText),
     agent_phone: visible.agent_phone || structured.agent_phone || matchFirst(allText, [/\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}/]),
     agent_broker: visible.agent_broker || structured.agent_broker || findBroker(allText),
+    image_url: visible.image_url || structured.image_url || findImageUrl(),
     listing_url: url,
     source,
   };
@@ -208,9 +215,10 @@ function extractListingFromPage() {
 
     facts.address = findAddress(joined, pageTitle);
     facts.price = lines.find((line) => /^\$[\d,]+(?:\/mo)?$/i.test(line)) || matchFirst(joined, [/\$[\d,]+(?:\/mo)?/i]);
-    facts.bed = numberBeforeLabel(lines, /^beds?$/i);
-    facts.bath = numberBeforeLabel(lines, /^baths?$/i);
+    facts.beds = numberBeforeLabel(lines, /^beds?$/i);
+    facts.baths = numberBeforeLabel(lines, /^baths?$/i);
     facts.sqft = numberBeforeLabel(lines, /^sqft$/i);
+    facts.image_url = findImageUrl();
 
     const specialIndex = lines.findIndex((line) => /^what'?s special$/i.test(line));
     if (specialIndex >= 0) {
@@ -291,8 +299,10 @@ function extractListingFromPage() {
       const lower = String(key || "").toLowerCase();
       const scalar = typeof value === "string" || typeof value === "number";
       if (!out.price && ["price", "unformattedprice", "rentzestimate"].includes(lower)) out.price = value;
-      if (!out.bed && ["numberofbedrooms", "bedrooms", "beds", "bed"].includes(lower)) out.bed = value;
-      if (!out.bath && ["numberofbathrooms", "bathrooms", "baths", "bath"].includes(lower)) out.bath = value;
+      if (!out.beds && ["numberofbedrooms", "bedrooms", "beds", "bed"].includes(lower)) out.beds = value;
+      if (!out.baths && ["numberofbathrooms", "bathrooms", "baths", "bath"].includes(lower)) out.baths = value;
+      if (!out.sqft && ["floorSize", "livingArea", "sqft", "livingAreaValue"].map(String).map((item) => item.toLowerCase()).includes(lower)) out.sqft = value;
+      if (!out.image_url && scalar && /(image|photo|thumbnail)/.test(lower) && /^https?:\/\//i.test(String(value))) out.image_url = value;
       if (!out.agent_name && scalar && /(agent|contact).*name|name/.test(lower) && looksLikePerson(value, parent)) out.agent_name = value;
       if (!out.agent_phone && scalar && /(phone|telephone)/.test(lower)) out.agent_phone = value;
       if (!out.agent_broker && scalar && /(broker|brokerage|provider|company|businessname)/.test(lower)) out.agent_broker = value;
@@ -385,6 +395,16 @@ function extractListingFromPage() {
       if (new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(blob)) features.push(toTitle(keyword));
     }
     return features.join(" | ") || null;
+  }
+
+  function findImageUrl() {
+    const meta = document.querySelector('meta[property="og:image"], meta[name="twitter:image"]')?.content;
+    if (meta) return meta;
+    const image = [...document.images].find((img) => {
+      const src = img.currentSrc || img.src || "";
+      return /^https?:\/\//i.test(src) && img.naturalWidth >= 320 && img.naturalHeight >= 180;
+    });
+    return image?.currentSrc || image?.src || null;
   }
 
   function formatFeatures(value) {

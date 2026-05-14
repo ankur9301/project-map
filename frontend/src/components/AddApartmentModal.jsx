@@ -4,16 +4,20 @@ import { Link, MapPin, X } from "lucide-react";
 const initialForm = {
   address: "",
   price: "",
-  features: "",
-  bed: "",
-  bath: "",
+  beds: "",
+  baths: "",
+  sqft: "",
+  building_has_gym: false,
+  pet_friendly: false,
   vibe: "",
   notes: "",
   agent_name: "",
   agent_phone: "",
   agent_broker: "",
   listing_url: "",
+  image_url: "",
   source: "",
+  neighborhood_name: "",
   favorite: false,
 };
 
@@ -38,8 +42,8 @@ export default function AddApartmentModal({ open, form, setForm, loading, onClos
       <form className="modal" onSubmit={onSubmit}>
         <div className="modalHeader">
           <div>
-            <p className="eyebrow">Hybrid input</p>
-            <h2>Add to decision workspace</h2>
+            <p className="eyebrow">Decision workspace</p>
+            <h2>Add an apartment to score</h2>
           </div>
           <button className="iconButton" type="button" onClick={onClose} aria-label="Close">
             <X size={18} />
@@ -51,7 +55,7 @@ export default function AddApartmentModal({ open, form, setForm, loading, onClos
             <Link size={18} />
             <div>
               <strong>Paste listing URL</strong>
-              <span>Best for quick saving from mobile or when the extension is not installed.</span>
+              <span>The Chrome extension is the fastest path — this modal is the manual backup.</span>
             </div>
           </div>
           <label className="field wide">
@@ -67,30 +71,45 @@ export default function AddApartmentModal({ open, form, setForm, loading, onClos
 
         <div className="formGrid">
           <label className="field">
-            <span>Price</span>
+            <span>Price ($)</span>
             <input type="number" min="0" value={form.price} onChange={(event) => update("price", event.target.value)} placeholder="3200" />
           </label>
           <label className="field">
-            <span>Bed</span>
-            <input type="number" min="0" step="0.5" value={form.bed} onChange={(event) => update("bed", event.target.value)} placeholder="1" />
+            <span>Beds</span>
+            <input type="number" min="0" step="0.5" value={form.beds} onChange={(event) => update("beds", event.target.value)} placeholder="1" />
           </label>
           <label className="field">
-            <span>Bath</span>
-            <input type="number" min="0" step="0.5" value={form.bath} onChange={(event) => update("bath", event.target.value)} placeholder="1" />
+            <span>Baths</span>
+            <input type="number" min="0" step="0.5" value={form.baths} onChange={(event) => update("baths", event.target.value)} placeholder="1" />
+          </label>
+          <label className="field">
+            <span>Sqft</span>
+            <input type="number" min="0" value={form.sqft} onChange={(event) => update("sqft", event.target.value)} placeholder="650" />
+          </label>
+        </div>
+
+        <div className="formGrid">
+          <label className="field">
+            <span>Neighborhood</span>
+            <input value={form.neighborhood_name} onChange={(event) => update("neighborhood_name", event.target.value)} placeholder="West Village" />
+          </label>
+          <label className="check inline">
+            <input type="checkbox" checked={form.building_has_gym} onChange={(event) => update("building_has_gym", event.target.checked)} />
+            <span>Building has gym</span>
+          </label>
+          <label className="check inline">
+            <input type="checkbox" checked={form.pet_friendly} onChange={(event) => update("pet_friendly", event.target.checked)} />
+            <span>Pet friendly</span>
           </label>
         </div>
 
         <label className="field wide">
-          <span>Features</span>
-          <input value={form.features} onChange={(event) => update("features", event.target.value)} placeholder="Doorman, laundry, gym, elevator" />
-        </label>
-        <label className="field wide">
           <span>Vibe</span>
-          <textarea value={form.vibe} onChange={(event) => update("vibe", event.target.value)} placeholder="Quiet block, close to groceries, sunlight..." />
+          <textarea value={form.vibe} onChange={(event) => update("vibe", event.target.value)} placeholder="Quiet block, sunlight, close to the park..." />
         </label>
         <label className="field wide">
           <span>Notes</span>
-          <textarea value={form.notes} onChange={(event) => update("notes", event.target.value)} placeholder="Broker details, tour notes, tradeoffs..." />
+          <textarea value={form.notes} onChange={(event) => update("notes", event.target.value)} placeholder="Tour notes, tradeoffs, broker details..." />
         </label>
         <div className="formGrid agentGrid">
           <label className="field">
@@ -107,8 +126,12 @@ export default function AddApartmentModal({ open, form, setForm, loading, onClos
           </label>
         </div>
         <label className="field wide">
+          <span>Image URL (optional)</span>
+          <input value={form.image_url} onChange={(event) => update("image_url", event.target.value)} placeholder="https://..." />
+        </label>
+        <label className="field wide">
           <span>Source</span>
-          <input value={form.source} onChange={(event) => update("source", event.target.value)} placeholder="zillow.com, streeteasy.com, apartments.com..." />
+          <input value={form.source} onChange={(event) => update("source", event.target.value)} placeholder="zillow.com, streeteasy.com..." />
         </label>
         <label className="check">
           <input type="checkbox" checked={form.favorite} onChange={(event) => update("favorite", event.target.checked)} />
@@ -118,7 +141,7 @@ export default function AddApartmentModal({ open, form, setForm, loading, onClos
         <div className="modalActions">
           <button className="ghostButton" type="button" onClick={onClose}>Cancel</button>
           <button className="primaryButton" disabled={loading} type="submit">
-            {loading ? "Calculating..." : "Add and calculate"}
+            {loading ? "Scoring..." : "Add and score"}
           </button>
         </div>
       </form>

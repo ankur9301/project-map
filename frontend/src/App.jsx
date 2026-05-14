@@ -1,70 +1,114 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Download, EyeOff, LayoutGrid, MapPin, Moon, Plus, Search, SlidersHorizontal, Sun, Trash2 } from "lucide-react";
-import { addApartment, deleteApartment, downloadExport, getApartments, getTarget, recalculateApartment, saveTarget, updateApartment } from "./api";
+import { Download, EyeOff, LayoutGrid, MapPin, Moon, Plus, RefreshCw, Search, SlidersHorizontal, Sun, Trash2 } from "lucide-react";
+import {
+  addApartment,
+  deleteApartment,
+  downloadExport,
+  getApartments,
+  getTarget,
+  recalculateApartment,
+  saveTarget,
+  updateApartment,
+} from "./api";
 import ApartmentCards from "./components/ApartmentCards";
 import ApartmentTable from "./components/ApartmentTable";
 import AddApartmentModal, { initialForm } from "./components/AddApartmentModal";
+import DecisionCompare from "./components/DecisionCompare";
 import MapPanel from "./components/MapPanel";
 import { supabase } from "./supabaseClient";
-import { getCommute, roundTrip } from "./utils";
+import { getCommute, overallScoreLabel, roundTrip, scoreNumber } from "./utils";
 import "./styles.css";
 
 const TABLE_COLUMNS = [
   ["address", "Address"],
+  ["neighborhood_name", "Neighborhood"],
   ["price", "Price"],
+  ["beds", "Beds"],
+  ["baths", "Baths"],
+  ["sqft", "Sqft"],
+  ["overall_score", "Overall"],
+  ["commute_score", "Commute"],
+  ["walkability_score", "Walk"],
+  ["grocery_score", "Grocery"],
+  ["gym_score", "Gym"],
+  ["lifestyle_score", "Lifestyle"],
   ["morning", "Morning"],
   ["evening", "Evening"],
   ["roundTrip", "Round trip"],
   ["distance", "Distance"],
-  ["bed", "Bed"],
-  ["bath", "Bath"],
   ["agent_name", "Agent"],
   ["agent_phone", "Phone"],
   ["agent_broker", "Broker"],
   ["source", "Source"],
   ["listing_url", "Link"],
-  ["features", "Features"],
   ["vibe", "Vibe"],
   ["notes", "Notes"],
-  ["score", "Score"],
 ];
 
-const DEFAULT_VISIBLE_COLUMNS = TABLE_COLUMNS.map(([key]) => key);
-const COLUMN_STORAGE_KEY = "visibleColumns.v2";
+const DEFAULT_VISIBLE_COLUMNS = [
+  "address",
+  "neighborhood_name",
+  "price",
+  "beds",
+  "baths",
+  "overall_score",
+  "commute_score",
+  "walkability_score",
+  "grocery_score",
+  "gym_score",
+  "morning",
+  "evening",
+  "roundTrip",
+];
+
+const COLUMN_STORAGE_KEY = "visibleColumns.v3";
+
 const CARD_SORTS = [
-  ["commute_score", "Score"],
+  ["overall_score", "Overall score"],
+  ["commute_score", "Commute"],
+  ["walkability_score", "Walkability"],
+  ["grocery_score", "Grocery"],
+  ["gym_score", "Gym"],
   ["price", "Price"],
   ["morning", "Morning"],
   ["evening", "Evening"],
   ["roundTrip", "Round trip"],
-  ["distance", "Distance"],
-  ["bed", "Bed"],
-  ["bath", "Bath"],
 ];
 
 function numeric(value) {
+  if (value === "" || value === undefined || value === null) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function nonEmpty(value) {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
 }
 
 export default function App() {
   const [apartments, setApartments] = useState([]);
   const [search, setSearch] = useState("");
   const [showFavorites, setShowFavorites] = useState(false);
-  const [theme, setTheme] = useState("light");
+  const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "light");
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [loading, setLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(true);
   const [toast, setToast] = useState("");
-  const [sortKey, setSortKey] = useState("commute_score");
+  const [sortKey, setSortKey] = useState("overall_score");
   const [sortDirection, setSortDirection] = useState("desc");
   const [viewPanelOpen, setViewPanelOpen] = useState(false);
   const [target, setTarget] = useState(null);
   const [targetForm, setTargetForm] = useState({ label: "Office", address: "731 Lexington Ave, New York, NY" });
+  const [compareIds, setCompareIds] = useState([]);
   const [visibleColumns, setVisibleColumns] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(COLUMN_STORAGE_KEY) || "null");
-      return Array.isArray(saved) && saved.length >= 6 ? saved.filter((key) => DEFAULT_VISIBLE_COLUMNS.includes(key)) : DEFAULT_VISIBLE_COLUMNS;
+      const validKeys = new Set(TABLE_COLUMNS.map(([key]) => key));
+      const filtered = Array.isArray(saved) ? saved.filter((key) => validKeys.has(key)) : null;
+      return filtered && filtered.length >= 6 ? filtered : DEFAULT_VISIBLE_COLUMNS;
     } catch {
       return DEFAULT_VISIBLE_COLUMNS;
     }
@@ -80,11 +124,14 @@ export default function App() {
   }, [visibleColumns]);
 
   async function load() {
+    setDataLoading(true);
     try {
       const data = await getApartments({ search, favorite: showFavorites ? true : undefined });
       setApartments(data.items);
     } catch (error) {
       setToast(error.message);
+    } finally {
+      setDataLoading(false);
     }
   }
 
@@ -130,17 +177,30 @@ export default function App() {
   async function handleSubmit(event) {
     event.preventDefault();
     setLoading(true);
-    setToast("Calculating commute with OTP...");
+    setToast("Scoring apartment — commute + nearby POIs...");
     try {
       await addApartment({
-        ...form,
+        address: nonEmpty(form.address),
+        listing_url: nonEmpty(form.listing_url),
+        image_url: nonEmpty(form.image_url),
+        source: nonEmpty(form.source),
+        neighborhood_name: nonEmpty(form.neighborhood_name),
         price: numeric(form.price),
-        bed: numeric(form.bed),
-        bath: numeric(form.bath),
+        beds: numeric(form.beds),
+        baths: numeric(form.baths),
+        sqft: numeric(form.sqft),
+        building_has_gym: !!form.building_has_gym,
+        pet_friendly: !!form.pet_friendly,
+        vibe: nonEmpty(form.vibe),
+        notes: nonEmpty(form.notes),
+        agent_name: nonEmpty(form.agent_name),
+        agent_phone: nonEmpty(form.agent_phone),
+        agent_broker: nonEmpty(form.agent_broker),
+        favorite: !!form.favorite,
       });
       setForm(initialForm);
       setModalOpen(false);
-      setToast("Apartment saved.");
+      setToast("Apartment saved and scored.");
       await load();
     } catch (error) {
       setToast(error.message);
@@ -155,18 +215,35 @@ export default function App() {
   }
 
   async function recalculate(id) {
-    setToast("Recalculating route...");
+    setToast("Recalculating commute + scores...");
     try {
       await recalculateApartment(id);
-      setToast("Commute refreshed.");
+      setToast("Scores refreshed.");
       await load();
     } catch (error) {
       setToast(error.message);
     }
   }
 
+  async function recalculateShownApartments() {
+    if (!sortedApartments.length) return;
+    setLoading(true);
+    setToast(`Recalculating ${sortedApartments.length} shown apartment${sortedApartments.length === 1 ? "" : "s"}...`);
+    try {
+      for (const apartment of sortedApartments) {
+        await recalculateApartment(apartment.id);
+      }
+      setToast("Shown apartments refreshed.");
+      await load();
+    } catch (error) {
+      setToast(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function remove(id) {
-    if (!window.confirm("Delete this apartment from your tracker?")) return;
+    if (!window.confirm("Delete this apartment from your decision workspace?")) return;
     try {
       await deleteApartment(id);
       setToast("Apartment deleted.");
@@ -178,7 +255,7 @@ export default function App() {
 
   async function deleteShownApartments() {
     if (!sortedApartments.length) return;
-    const ok = window.confirm(`Delete ${sortedApartments.length} shown apartment${sortedApartments.length === 1 ? "" : "s"} from your tracker?`);
+    const ok = window.confirm(`Delete ${sortedApartments.length} shown apartment${sortedApartments.length === 1 ? "" : "s"}?`);
     if (!ok) return;
     try {
       await Promise.all(sortedApartments.map((apartment) => deleteApartment(apartment.id)));
@@ -192,11 +269,11 @@ export default function App() {
   async function handleTargetSubmit(event) {
     event.preventDefault();
     setLoading(true);
-    setToast("Saving target and recalculating commutes...");
+    setToast("Saving target and rescoring all apartments...");
     try {
       const updated = await saveTarget(targetForm, true);
       setTarget(updated);
-      setToast("Target saved. Commutes refreshed.");
+      setToast("Target saved. Scores refreshed.");
       await load();
     } catch (error) {
       setToast(error.message);
@@ -220,8 +297,15 @@ export default function App() {
       setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
     } else {
       setSortKey(key);
-      setSortDirection("asc");
+      setSortDirection(key === "price" ? "asc" : "desc");
     }
+  }
+
+  function toggleCompare(id) {
+    setCompareIds((current) => {
+      if (current.includes(id)) return current.filter((item) => item !== id);
+      return [...current.slice(-2), id];
+    });
   }
 
   const sortedApartments = useMemo(() => {
@@ -236,8 +320,9 @@ export default function App() {
           ? morning.total_distance_km + evening.total_distance_km
           : null;
       }
-      if (sortKey === "score") return apartment.commute_score;
-      if (sortKey === "commute_score") return apartment.commute_score;
+      if (sortKey === "price") return scoreNumber(apartment.price);
+      // numeric score fields
+      if (sortKey.endsWith("_score")) return scoreNumber(apartment[sortKey]);
       return apartment[sortKey];
     };
     return [...apartments].sort((a, b) => {
@@ -250,13 +335,15 @@ export default function App() {
     });
   }, [apartments, sortKey, sortDirection]);
 
-  const bestId = useMemo(() => {
-    const ranked = apartments.filter((item) => roundTrip(item) !== null).sort((a, b) => roundTrip(a) - roundTrip(b));
-    return ranked[0]?.id;
+  const bestOverall = useMemo(() => {
+    const ranked = apartments.filter((a) => scoreNumber(a.overall_score) !== null)
+      .sort((a, b) => scoreNumber(b.overall_score) - scoreNumber(a.overall_score));
+    return ranked[0];
   }, [apartments]);
 
   const cheapestId = useMemo(() => {
-    const ranked = apartments.filter((item) => Number.isFinite(item.price)).sort((a, b) => a.price - b.price);
+    const ranked = apartments.filter((item) => Number.isFinite(Number(item.price)))
+      .sort((a, b) => Number(a.price) - Number(b.price));
     return ranked[0]?.id;
   }, [apartments]);
 
@@ -265,13 +352,18 @@ export default function App() {
     return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
   }, [apartments]);
 
+  const averageOverall = useMemo(() => {
+    const values = apartments.map((a) => scoreNumber(a.overall_score)).filter((v) => v !== null);
+    return values.length ? (values.reduce((sum, v) => sum + v, 0) / values.length).toFixed(0) : null;
+  }, [apartments]);
+
   return (
     <main>
       <header className="appHeader">
         <div>
-          <p className="eyebrow">NYC / NJ apartment hunt</p>
-          <h1>Commute <em>tracker.</em></h1>
-          <p className="subtitle">A local command center for turning listing chaos into a ranked, side-by-side shortlist of where you could actually live.</p>
+          <p className="eyebrow">Decision workspace</p>
+          <h1>Apartment <em>intelligence.</em></h1>
+          <p className="subtitle">Transit-aware scoring across commute, lifestyle, groceries, and gym access — so you can compare apartments on the things that actually shape daily life.</p>
         </div>
         <div className="heroConsole" aria-label="Tracker status">
           <div>
@@ -279,12 +371,12 @@ export default function App() {
             <strong>{target?.label || "Office"}</strong>
           </div>
           <div>
-            <span>AM route</span>
-            <strong>7:00</strong>
+            <span>Top overall</span>
+            <strong>{bestOverall ? overallScoreLabel(bestOverall.overall_score) : "—"}</strong>
           </div>
           <div>
-            <span>PM route</span>
-            <strong>5:30</strong>
+            <span>Avg overall</span>
+            <strong>{averageOverall ?? "—"}</strong>
           </div>
         </div>
         <div className="headerActions">
@@ -298,21 +390,31 @@ export default function App() {
 
       <section className="stats">
         <div><span>Total listings</span><strong>{apartments.length}</strong></div>
+        <div><span>Avg overall</span><strong>{averageOverall ?? "—"}</strong></div>
         <div><span>Avg round trip</span><strong>{averageRoundTrip ? `${averageRoundTrip} min` : "—"}</strong></div>
         <div><span>Favorites</span><strong>{apartments.filter((item) => item.favorite).length}</strong></div>
-        <div><span>Route engine</span><strong>Google</strong></div>
       </section>
+
+      {dataLoading && (
+        <section className="loadingStrip" aria-live="polite">
+          <RefreshCw size={16} />
+          Syncing your apartment workspace...
+        </section>
+      )}
 
       <section className="toolbar">
         <label className="searchBox">
           <Search size={18} />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search address, features, vibe..." />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search address, neighborhood, vibe, notes..." />
         </label>
         <button className={`ghostButton ${showFavorites ? "selected" : ""}`} type="button" onClick={() => setShowFavorites((current) => !current)}>
           Favorites
         </button>
         <button className={`ghostButton ${viewPanelOpen ? "selected" : ""}`} type="button" onClick={() => setViewPanelOpen((current) => !current)}>
           <SlidersHorizontal size={16} /> View
+        </button>
+        <button className="ghostButton" type="button" onClick={recalculateShownApartments} disabled={!sortedApartments.length || loading}>
+          <RefreshCw size={16} /> Recalculate shown
         </button>
         <button className="ghostButton dangerButton" type="button" onClick={deleteShownApartments} disabled={!sortedApartments.length}>
           <Trash2 size={16} /> Delete shown
@@ -323,7 +425,7 @@ export default function App() {
         <div>
           <p className="eyebrow">Target location</p>
           <h2>{target?.address || "Choose your office or destination"}</h2>
-          <p className="muted">Routes calculate home to target at 7:00 AM, then target back home at 5:30 PM.</p>
+          <p className="muted">Routes calculate home to target at 7:00 AM, then target back home at 5:30 PM. Changing this rescores every apartment.</p>
         </div>
         <form className="targetForm" onSubmit={handleTargetSubmit}>
           <label className="targetInput small">
@@ -345,7 +447,7 @@ export default function App() {
           <div>
             <p className="eyebrow">Table controls</p>
             <h2>Choose what stays on the page</h2>
-            <p className="muted">Hide noisy columns while you compare listings. This only changes the page view, not the saved Excel data.</p>
+            <p className="muted">Hide noisy columns while you compare listings. This only changes the page view, not the saved data.</p>
           </div>
           <div className="columnChips">
             {TABLE_COLUMNS.map(([key, label]) => (
@@ -371,9 +473,9 @@ export default function App() {
       {!sortedApartments.length && (
         <section className="emptyState">
           <div>
-            <p className="eyebrow">Ready for listings</p>
-            <h2>Start with one apartment address</h2>
-            <p className="muted">Add a Zillow, StreetEasy, or Apartments.com address and the tracker will save the listing. Commute timing appears after OTP is running.</p>
+            <p className="eyebrow">Ready to score</p>
+            <h2>Add an apartment to begin</h2>
+            <p className="muted">Use the Chrome extension on Zillow/StreetEasy/Apartments.com or add an address manually. The backend scores commute, walkability, grocery, gym, and lifestyle — all transparent heuristics, no AI black box.</p>
           </div>
           <button className="primaryButton" type="button" onClick={() => setModalOpen(true)}><Plus size={16} />Add apartment</button>
         </section>
@@ -383,7 +485,7 @@ export default function App() {
         <section className="cardSortPanel">
           <div>
             <p className="eyebrow">Card sorting</p>
-            <h2>Browse by what matters</h2>
+            <h2>Sort by what matters</h2>
           </div>
           <div className="cardSortChips">
             {CARD_SORTS.map(([key, label]) => (
@@ -403,18 +505,29 @@ export default function App() {
 
       <section className="contentGrid">
         <div className="listingPane">
-          <ApartmentCards apartments={sortedApartments} bestId={bestId} cheapestId={cheapestId} onToggleFavorite={toggleFavorite} onDelete={remove} />
+          <ApartmentCards
+            apartments={sortedApartments}
+            bestId={bestOverall?.id}
+            cheapestId={cheapestId}
+            compareIds={compareIds}
+            onToggleCompare={toggleCompare}
+            onToggleFavorite={toggleFavorite}
+            onRecalculate={recalculate}
+            onDelete={remove}
+          />
         </div>
         <MapPanel apartments={sortedApartments} target={target} />
       </section>
+
+      <DecisionCompare apartments={sortedApartments} selectedIds={compareIds} onToggle={toggleCompare} />
 
       <section className="comparisonPanel">
         <div className="comparisonHeader">
           <div>
             <p className="eyebrow">Comparison matrix</p>
-            <h2>Full apartment details</h2>
+            <h2>Side-by-side fields</h2>
           </div>
-          <p className="muted">Scroll horizontally for all listing, contact, commute, and notes fields.</p>
+          <p className="muted">Scroll horizontally to see all scores, commute breakdowns, listing info, and notes side-by-side.</p>
         </div>
         <ApartmentTable
           apartments={sortedApartments}
