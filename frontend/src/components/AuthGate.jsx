@@ -26,6 +26,8 @@ export default function AuthGate({ children }) {
   const [reason, setReason] = useState("");
   const [message, setMessage] = useState("");
   const [submittedRequest, setSubmittedRequest] = useState(false);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -39,7 +41,8 @@ export default function AuthGate({ children }) {
       setSession(data.session);
       setLoading(false);
     });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
       setSession(nextSession);
       setLoading(false);
     });
@@ -90,6 +93,36 @@ export default function AuthGate({ children }) {
       return;
     }
     setSubmittedRequest(true);
+  }
+
+  async function handlePasswordReset(event) {
+    event.preventDefault();
+    setMessage("");
+    if (!email.trim()) {
+      setMessage("Enter your email first, then request a reset link.");
+      return;
+    }
+    setBusy(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo: window.location.origin,
+    });
+    setBusy(false);
+    setMessage(error ? error.message : "Password reset email sent. Check your inbox.");
+  }
+
+  async function handleUpdatePassword(event) {
+    event.preventDefault();
+    setMessage("");
+    setBusy(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setBusy(false);
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    setPasswordRecovery(false);
+    setNewPassword("");
+    setMessage("Password updated. You can keep using the dashboard.");
   }
 
   async function copyExtensionToken() {
@@ -186,6 +219,9 @@ export default function AuthGate({ children }) {
               <button className="primaryButton authButton" type="submit" disabled={busy}>
                 {busy ? "Signing in…" : "Sign in"}
               </button>
+              <button className="ghostButton authButton" type="button" disabled={busy} onClick={handlePasswordReset}>
+                Forgot password?
+              </button>
             </form>
           ) : (
             <form className="authForm" onSubmit={handleRequestAccess}>
@@ -239,6 +275,37 @@ export default function AuthGate({ children }) {
             <LogOut size={15} />
             Sign out
           </button>
+        </section>
+      </main>
+    );
+  }
+
+  if (passwordRecovery) {
+    return (
+      <main className="authShell">
+        <section className="authCard">
+          <p className="eyebrow">Password reset</p>
+          <h1>Choose a new password</h1>
+          <form className="authForm" onSubmit={handleUpdatePassword}>
+            <label>
+              <span>New password</span>
+              <div>
+                <KeyRound size={17} />
+                <input
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  type="password"
+                  placeholder="New password"
+                  required
+                  minLength={6}
+                />
+              </div>
+            </label>
+            <button className="primaryButton authButton" type="submit" disabled={busy}>
+              {busy ? "Updating..." : "Update password"}
+            </button>
+          </form>
+          {message && <p className="authMessage">{message}</p>}
         </section>
       </main>
     );
