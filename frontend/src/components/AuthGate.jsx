@@ -10,6 +10,7 @@ export default function AuthGate({ children }) {
   const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState("");
   const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [approved, setApproved] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -29,6 +30,19 @@ export default function AuthGate({ children }) {
     });
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!supabase || !session?.user?.id) {
+      setApproved(null);
+      return;
+    }
+    supabase
+      .from("profiles")
+      .select("is_approved")
+      .eq("id", session.user.id)
+      .maybeSingle()
+      .then(({ data }) => setApproved(Boolean(data?.is_approved)));
+  }, [session?.user?.id]);
 
   async function handleSignIn(event) {
     event.preventDefault();
@@ -56,7 +70,7 @@ export default function AuthGate({ children }) {
       setMessage(error.message);
       return;
     }
-    setMessage(data.session ? "Account created. You are signed in." : "Check your email to confirm your account, then sign in.");
+    setMessage(data.session ? "Account created. If your email is approved, your workspace will open." : "Check your email to confirm your account, then sign in.");
   }
 
   async function handlePasswordReset(event) {
@@ -195,6 +209,24 @@ export default function AuthGate({ children }) {
           </form>
 
           {message && <p className="authMessage">{message}</p>}
+        </section>
+      </main>
+    );
+  }
+
+  if (approved === false) {
+    return (
+      <main className="authShell">
+        <section className="authCard">
+          <p className="eyebrow">Waiting for approval</p>
+          <h1>This email is not approved yet</h1>
+          <p className="muted">
+            Ask the admin to add your email to the approved users list. After that, sign out and sign in again.
+          </p>
+          <button className="primaryButton authButton" type="button" onClick={() => supabase.auth.signOut()}>
+            <LogOut size={15} />
+            Sign out
+          </button>
         </section>
       </main>
     );

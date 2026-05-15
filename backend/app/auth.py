@@ -34,6 +34,16 @@ def _supabase_auth_url() -> str:
     return f"{base_url}/auth/v1/user"
 
 
+def _supabase_rest_url(path: str) -> str:
+    settings = get_settings()
+    if not settings.supabase_url or not settings.supabase_anon_key:
+        raise HTTPException(status_code=500, detail="Supabase auth is not configured on the backend.")
+    base_url = settings.supabase_url.rstrip("/")
+    if base_url.endswith("/rest/v1"):
+        base_url = base_url.removesuffix("/rest/v1")
+    return f"{base_url}/rest/v1/{path.lstrip('/')}"
+
+
 async def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(security)) -> CurrentUser:
     settings = get_settings()
     if credentials is None:
@@ -54,12 +64,21 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials | None = De
                 },
             )
             response.raise_for_status()
+            payload = response.json()
+            profile_response = await client.get(
+                _supabase_rest_url("profiles"),
+                params={"select": "is_approved", "id": f"eq.{payload.get('id')}", "limit": "1"},
+                headers={
+                    "apikey": settings.supabase_anon_key or "",
+                    "Authorization": f"Bearer {token}",
+                },
+            )
+            profile_response.raise_for_status()
     except httpx.HTTPStatusError as exc:
         raise HTTPException(status_code=401, detail="Invalid or expired login token.") from exc
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"Could not verify Supabase token: {exc}") from exc
 
-    payload = response.json()
     user_id = payload.get("id")
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid Supabase user payload.")
@@ -67,6 +86,9 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials | None = De
         UUID(user_id)  # validate shape — apartments.user_id is a UUID column
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=401, detail="Supabase user id is not a UUID.") from exc
+    profiles = profile_response.json()
+    if not profiles or not profiles[0].get("is_approved"):
+        raise HTTPException(status_code=403, detail="This account is waiting for admin approval.")
     current_user = CurrentUser(id=user_id, email=payload.get("email"))
     _auth_cache[token] = (monotonic() + _AUTH_CACHE_TTL_SECONDS, current_user)
     return current_user
