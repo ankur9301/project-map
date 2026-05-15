@@ -35,9 +35,12 @@ class Settings(BaseSettings):
     routing_provider: str = "google"
     google_maps_api_key: str | None = None
 
-    # --- Supabase (auth verification) -----------------------------------
+    # --- Supabase (auth verification + admin invites) -------------------
     supabase_url: str | None = None
     supabase_anon_key: str | None = None
+    supabase_service_role_key: str | None = None      # NEVER expose to frontend
+    admin_api_secret: str | None = None               # gates /admin/* endpoints
+    frontend_site_url: str = "https://ankur9301.github.io"
 
     # --- Places API tuning ----------------------------------------------
     places_search_radius_m: int = 1200       # ~15 min walk

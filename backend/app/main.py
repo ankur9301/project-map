@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from .admin import public_router as access_router, router as admin_router
 from .auth import CurrentUser, get_current_user
 from .database import get_db
 from .exporter import build_excel
@@ -29,12 +30,19 @@ app = FastAPI(title="project_map · decision intelligence API", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://ankur9301.github.io",
+    ],
     allow_origin_regex=r"chrome-extension://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(access_router)
+app.include_router(admin_router)
 
 
 # --------------------------------------------------------------------------- #

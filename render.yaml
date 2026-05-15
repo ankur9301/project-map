@@ -1,0 +1,55 @@
+# Render Blueprint for project_map backend
+# -----------------------------------------
+# What this file does:
+#   When you connect this repo to Render, Render reads this file and creates
+#   the service automatically. Without it, you'd click through the dashboard.
+#   Either path works — this just makes it reproducible.
+#
+# Usage:
+#   1. Push this file to main.
+#   2. Render dashboard -> "New" -> "Blueprint" -> connect project_map.
+#   3. Render reads this file, creates the service, asks for the secret values
+#      listed under `sync: false`.
+#
+# Free plan limits:
+#   - 750 hours/month free
+#   - Service sleeps after 15 minutes of inactivity
+#   - Cold start ~30 seconds
+#   - 512 MB RAM, 0.1 CPU
+
+services:
+  - type: web
+    name: project-map-backend
+    runtime: docker
+    plan: free
+    region: oregon              # or 'virginia' if east-coast users
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    autoDeploy: true            # redeploy on push to main
+
+    envVars:
+      # Public-ish config (safe to commit)
+      - key: FRONTEND_SITE_URL
+        value: https://ankur9301.github.io
+      - key: ROUTING_PROVIDER
+        value: google
+      - key: PLACES_SEARCH_RADIUS_M
+        value: "1200"
+      - key: PLACES_CACHE_TTL_DAYS
+        value: "30"
+
+      # Secrets — `sync: false` means Render will prompt you for these on
+      # first deploy and store them encrypted. They never get committed.
+      - key: DATABASE_URL
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ADMIN_API_SECRET
+        sync: false
