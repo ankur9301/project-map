@@ -28,12 +28,12 @@ const COLUMN_WIDTHS = {
   lifestyle_score: 95,
 };
 
-export default function ApartmentTable({ apartments, columns, visibleColumns, sortKey, sortDirection, onSort, onToggleFavorite, onRecalculate, onDelete }) {
+export default function ApartmentTable({ apartments, columns, visibleColumns, sortKey, sortDirection, onSort, onToggleFavorite, onRecalculate, onDelete, commuteMode = "transit" }) {
   const headers = columns.filter(([key]) => visibleColumns.includes(key));
 
   function valueFor(apartment, key) {
-    const morning = getCommute(apartment, "morning");
-    const evening = getCommute(apartment, "evening");
+    const morning = getCommute(apartment, "morning", commuteMode);
+    const evening = getCommute(apartment, "evening", commuteMode);
     const distanceKm = Number.isFinite(morning.total_distance_km) && Number.isFinite(evening.total_distance_km)
       ? morning.total_distance_km + evening.total_distance_km
       : null;
@@ -43,7 +43,7 @@ export default function ApartmentTable({ apartments, columns, visibleColumns, so
       price: priceLabel(apartment.price),
       morning: minutesLabel(morning.total_minutes),
       evening: minutesLabel(evening.total_minutes),
-      roundTrip: minutesLabel(roundTrip(apartment)),
+      roundTrip: minutesLabel(roundTrip(apartment, commuteMode)),
       distance: distanceLabel(distanceKm),
       beds: apartment.beds ?? "-",
       baths: apartment.baths ?? "-",

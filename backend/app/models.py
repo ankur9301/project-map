@@ -108,12 +108,13 @@ class Apartment(Base):
 class Commute(Base):
     __tablename__ = "commutes"
     __table_args__ = (
-        UniqueConstraint("apartment_id", "direction", name="uq_commute_apartment_direction"),
+        UniqueConstraint("apartment_id", "direction", "mode", name="uq_commute_apartment_direction_mode"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
     apartment_id: Mapped[int] = mapped_column(ForeignKey("apartments.id", ondelete="CASCADE"), nullable=False, index=True)
     direction: Mapped[str] = mapped_column(String(20), nullable=False)
+    mode: Mapped[str] = mapped_column(String(20), nullable=False, default="transit")
     total_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     total_distance_km: Mapped[float | None] = mapped_column(Float, nullable=True)
     transfers: Mapped[int | None] = mapped_column(Integer, nullable=True)

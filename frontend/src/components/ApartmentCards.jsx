@@ -1,5 +1,5 @@
 import React from "react";
-import { Clock, Dumbbell, ExternalLink, Footprints, MapPin, MoreHorizontal, RefreshCw, ShoppingBasket, Sparkles, Star, Trash2, TreePine, TramFront } from "lucide-react";
+import { Bike, Car, Clock, Dumbbell, ExternalLink, Footprints, MapPin, MoreHorizontal, RefreshCw, ShoppingBasket, Sparkles, Star, Trash2, TreePine, TramFront } from "lucide-react";
 import {
   arrivalLabel,
   commuteTone,
@@ -61,6 +61,20 @@ function splitRouteMetrics(metrics = "") {
     walk: parts[2] || "",
     lines: parts.slice(3).join(", "),
   };
+}
+
+function modeLabel(mode = "transit") {
+  return {
+    transit: "Transit",
+    car: "Car",
+    cycling: "Cycling",
+    walking: "Walking",
+  }[mode] || "Transit";
+}
+
+function ModeIcon({ mode }) {
+  const Icon = { car: Car, cycling: Bike, walking: Footprints, transit: TramFront }[mode] || TramFront;
+  return <Icon size={14} />;
 }
 
 function transferLabel(count) {
@@ -161,9 +175,10 @@ function ScoreBar({ Icon, label, score }) {
   );
 }
 
-function RouteOptionList({ title, summary }) {
+function RouteOptionList({ title, summary, commuteMode = "transit" }) {
   if (!summary) return null;
   const options = summary.match(/Fastest[^\n]*(?:\n(?!Fastest).*)*/g) || [];
+  const isTransit = commuteMode === "transit";
 
   return (
     <details className="routeDetails" open={title === "Morning route options"}>
@@ -177,6 +192,7 @@ function RouteOptionList({ title, summary }) {
           const { duration, transfers, walk, lines } = splitRouteMetrics(metrics);
           const tokens = transitTokens(lines);
           const cleanSteps = routeSteps(steps.replaceAll(" -> ", " | "));
+          const simpleMetrics = metrics.split(",").map((item) => item.trim()).filter(Boolean);
 
           return (
             <article className="routeOption" key={`${title}-${label}-${metrics}`}>
@@ -189,17 +205,32 @@ function RouteOptionList({ title, summary }) {
                   <span className="routeLabel">{label}</span>
                 </div>
               </div>
-              <div className="routePath" aria-label={`${label} transit lines`}>
-                {tokens.map((token, index) => (
-                  <React.Fragment key={token}>
-                    {index > 0 && <span className="routeArrow">&gt;</span>}
-                    <TransitBadge token={token} />
-                  </React.Fragment>
-                ))}
-              </div>
+              {isTransit ? (
+                <div className="routePath" aria-label={`${label} transit lines`}>
+                  {tokens.map((token, index) => (
+                    <React.Fragment key={token}>
+                      {index > 0 && <span className="routeArrow">&gt;</span>}
+                      <TransitBadge token={token} />
+                    </React.Fragment>
+                  ))}
+                </div>
+              ) : (
+                <div className="routePath simple" aria-label={`${label} ${modeLabel(commuteMode)} route`}>
+                  <span className="routeModePill"><ModeIcon mode={commuteMode} />{modeLabel(commuteMode)}</span>
+                </div>
+              )}
               <div className="routeMetrics">
-                <span>{transfers}</span>
-                <span><Footprints size={14} />{walk}</span>
+                {isTransit ? (
+                  <>
+                    <span>{transfers}</span>
+                    <span><Footprints size={14} />{walk}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{simpleMetrics[1] || "Distance pending"}</span>
+                    <span><ModeIcon mode={commuteMode} />{simpleMetrics[2] || modeLabel(commuteMode)}</span>
+                  </>
+                )}
               </div>
               {cleanSteps.length > 0 && (
                 <ol className="routeStepList">
@@ -214,13 +245,13 @@ function RouteOptionList({ title, summary }) {
   );
 }
 
-export default function ApartmentCards({ apartments, bestId, cheapestId, compareIds = [], onToggleCompare, onToggleFavorite, onRecalculate, onDelete }) {
+export default function ApartmentCards({ apartments, bestId, cheapestId, compareIds = [], onToggleCompare, onToggleFavorite, onRecalculate, onDelete, commuteMode = "transit" }) {
   return (
     <section className="cardsGrid" aria-label="Apartment cards">
       {apartments.map((apartment) => {
-        const morning = getCommute(apartment, "morning");
-        const evening = getCommute(apartment, "evening");
-        const trip = roundTrip(apartment);
+        const morning = getCommute(apartment, "morning", commuteMode);
+        const evening = getCommute(apartment, "evening", commuteMode);
+        const trip = roundTrip(apartment, commuteMode);
         const distanceKm = Number.isFinite(morning.total_distance_km) && Number.isFinite(evening.total_distance_km)
           ? morning.total_distance_km + evening.total_distance_km
           : null;
@@ -317,19 +348,25 @@ export default function ApartmentCards({ apartments, bestId, cheapestId, compare
             </div>
 
             <div className="commuteSummary">
-              <span>{lines || "Transit lines appear after routing"}</span>
+              <span>{lines || `${modeLabel(commuteMode)} route appears after routing`}</span>
               <span>Round trip {minutesLabel(trip)}</span>
               <span>{distanceLabel(distanceKm)} total</span>
-              <span>Morning: {transferLabel(morning.transfers)}</span>
-              <span>Evening: {transferLabel(evening.transfers)}</span>
+              {commuteMode === "transit" ? (
+                <>
+                  <span>Morning: {transferLabel(morning.transfers)}</span>
+                  <span>Evening: {transferLabel(evening.transfers)}</span>
+                </>
+              ) : (
+                <span>{modeLabel(commuteMode)} time saved for this mode</span>
+              )}
             </div>
 
             {(morning.route_summary || evening.route_summary) && (
               <details className="cardDrawer">
                 <summary><MoreHorizontal size={17} />Route detail</summary>
                 <div className="routeOptions">
-                  <RouteOptionList title="Morning route options" summary={morning.route_summary} />
-                  <RouteOptionList title="Evening route options" summary={evening.route_summary} />
+                  <RouteOptionList title="Morning route options" summary={morning.route_summary} commuteMode={commuteMode} />
+                  <RouteOptionList title="Evening route options" summary={evening.route_summary} commuteMode={commuteMode} />
                 </div>
               </details>
             )}

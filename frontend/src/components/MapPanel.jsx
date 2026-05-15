@@ -21,15 +21,15 @@ function markerIcon(className, label) {
   });
 }
 
-function popupHtml(apartment) {
-  const morning = getCommute(apartment, "morning");
-  const evening = getCommute(apartment, "evening");
+function popupHtml(apartment, commuteMode) {
+  const morning = getCommute(apartment, "morning", commuteMode);
+  const evening = getCommute(apartment, "evening", commuteMode);
   return `
     <div class="mapPopup">
       <strong>${escapeHtml(apartment.address)}</strong>
       <span>${escapeHtml(priceLabel(apartment.price))} / ${apartment.bed ?? "-"} bed / ${apartment.bath ?? "-"} bath</span>
       <span>AM ${escapeHtml(minutesLabel(morning.total_minutes))} · PM ${escapeHtml(minutesLabel(evening.total_minutes))}</span>
-      <span>Round trip ${escapeHtml(minutesLabel(roundTrip(apartment)))}</span>
+      <span>Round trip ${escapeHtml(minutesLabel(roundTrip(apartment, commuteMode)))}</span>
     </div>
   `;
 }
@@ -43,7 +43,7 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-export default function MapPanel({ apartments, target }) {
+export default function MapPanel({ apartments, target, commuteMode = "transit" }) {
   const mapNode = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
@@ -96,7 +96,7 @@ export default function MapPanel({ apartments, target }) {
       const position = [apartment.latitude, apartment.longitude];
       bounds.extend(position);
       L.marker(position, { icon: markerIcon("apartment", String(index + 1)) })
-        .bindPopup(popupHtml(apartment))
+        .bindPopup(popupHtml(apartment, commuteMode))
         .addTo(layerRef.current);
     });
 
@@ -105,7 +105,7 @@ export default function MapPanel({ apartments, target }) {
     } else {
       mapRef.current.setView([targetPoint.lat, targetPoint.lon], 12);
     }
-  }, [plotted, targetPoint]);
+  }, [plotted, targetPoint, commuteMode]);
 
   return (
     <section className="mapPanel">

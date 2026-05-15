@@ -315,14 +315,16 @@ export default function App() {
     });
   }
 
+  const activeCommuteMode = target?.commute_mode || targetForm.commute_mode || "transit";
+
   const sortedApartments = useMemo(() => {
     const valueFor = (apartment) => {
-      if (sortKey === "morning") return getCommute(apartment, "morning").total_minutes;
-      if (sortKey === "evening") return getCommute(apartment, "evening").total_minutes;
-      if (sortKey === "roundTrip") return roundTrip(apartment);
+      if (sortKey === "morning") return getCommute(apartment, "morning", activeCommuteMode).total_minutes;
+      if (sortKey === "evening") return getCommute(apartment, "evening", activeCommuteMode).total_minutes;
+      if (sortKey === "roundTrip") return roundTrip(apartment, activeCommuteMode);
       if (sortKey === "distance") {
-        const morning = getCommute(apartment, "morning");
-        const evening = getCommute(apartment, "evening");
+        const morning = getCommute(apartment, "morning", activeCommuteMode);
+        const evening = getCommute(apartment, "evening", activeCommuteMode);
         return Number.isFinite(morning.total_distance_km) && Number.isFinite(evening.total_distance_km)
           ? morning.total_distance_km + evening.total_distance_km
           : null;
@@ -340,7 +342,7 @@ export default function App() {
       if (typeof av === "number" && typeof bv === "number") return sortDirection === "asc" ? av - bv : bv - av;
       return sortDirection === "asc" ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
     });
-  }, [apartments, sortKey, sortDirection]);
+  }, [apartments, sortKey, sortDirection, activeCommuteMode]);
 
   const bestOverall = useMemo(() => {
     const ranked = apartments.filter((a) => scoreNumber(a.overall_score) !== null)
@@ -355,9 +357,9 @@ export default function App() {
   }, [apartments]);
 
   const averageRoundTrip = useMemo(() => {
-    const values = apartments.map(roundTrip).filter(Number.isFinite);
+    const values = apartments.map((apartment) => roundTrip(apartment, activeCommuteMode)).filter(Number.isFinite);
     return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
-  }, [apartments]);
+  }, [apartments, activeCommuteMode]);
 
   const averageOverall = useMemo(() => {
     const values = apartments.map((a) => scoreNumber(a.overall_score)).filter((v) => v !== null);
@@ -543,12 +545,13 @@ export default function App() {
             onToggleFavorite={toggleFavorite}
             onRecalculate={recalculate}
             onDelete={remove}
+            commuteMode={activeCommuteMode}
           />
         </div>
-        <MapPanel apartments={sortedApartments} target={target} />
+        <MapPanel apartments={sortedApartments} target={target} commuteMode={activeCommuteMode} />
       </section>
 
-      <DecisionCompare apartments={sortedApartments} selectedIds={compareIds} onToggle={toggleCompare} />
+      <DecisionCompare apartments={sortedApartments} selectedIds={compareIds} onToggle={toggleCompare} commuteMode={activeCommuteMode} />
 
       <section className="comparisonPanel">
         <div className="comparisonHeader">
@@ -568,6 +571,7 @@ export default function App() {
           onToggleFavorite={toggleFavorite}
           onRecalculate={recalculate}
           onDelete={remove}
+          commuteMode={activeCommuteMode}
         />
       </section>
 

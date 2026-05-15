@@ -10,12 +10,12 @@ const METRICS = [
   ["gym_score", "Gym", Dumbbell],
 ];
 
-function routeLine(apartment) {
-  const morning = getCommute(apartment, "morning");
+function routeLine(apartment, commuteMode) {
+  const morning = getCommute(apartment, "morning", commuteMode);
   return morning.lines || "Route pending";
 }
 
-export default function DecisionCompare({ apartments, selectedIds, onToggle }) {
+export default function DecisionCompare({ apartments, selectedIds, onToggle, commuteMode = "transit" }) {
   const selected = selectedIds
     .map((id) => apartments.find((apartment) => apartment.id === id))
     .filter(Boolean);
@@ -35,8 +35,8 @@ export default function DecisionCompare({ apartments, selectedIds, onToggle }) {
 
       <div className="compareGrid">
         {cards.map((apartment, index) => {
-          const morning = getCommute(apartment, "morning");
-          const evening = getCommute(apartment, "evening");
+          const morning = getCommute(apartment, "morning", commuteMode);
+          const evening = getCommute(apartment, "evening", commuteMode);
           return (
             <article className="compareCard" key={apartment.id}>
               <div className="compareRank">{String.fromCharCode(65 + index)}</div>
@@ -62,9 +62,9 @@ export default function DecisionCompare({ apartments, selectedIds, onToggle }) {
               <div className="compareCommutes">
                 <span><strong>{minutesLabel(morning.total_minutes)}</strong> morning</span>
                 <span><strong>{minutesLabel(evening.total_minutes)}</strong> evening</span>
-                <span><strong>{minutesLabel(roundTrip(apartment))}</strong> round trip</span>
+                <span><strong>{minutesLabel(roundTrip(apartment, commuteMode))}</strong> round trip</span>
               </div>
-              <div className="compareRoute">{routeLine(apartment)}</div>
+              <div className="compareRoute">{routeLine(apartment, commuteMode)}</div>
               <div className="compareScores">
                 {METRICS.map(([key, label, Icon]) => (
                   <div key={key}>

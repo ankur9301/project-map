@@ -16,6 +16,7 @@ class CommuteRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     direction: str
+    mode: str = "transit"
     total_minutes: int | None = None
     total_distance_km: float | None = None
     transfers: int | None = None

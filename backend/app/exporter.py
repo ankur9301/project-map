@@ -7,15 +7,24 @@ from io import BytesIO
 import pandas as pd
 from sqlalchemy.orm import Session
 
-from .models import Apartment
+from .models import Apartment, TargetLocation
 
 
-def _commute_map(apartment: Apartment) -> dict:
-    return {commute.direction: commute for commute in apartment.commutes}
+def _commute_map(apartment: Apartment, mode: str) -> dict:
+    selected = mode if mode in {"transit", "car", "cycling", "walking"} else "transit"
+    commutes: dict = {}
+    for commute in apartment.commutes:
+        if commute.mode == selected:
+            commutes[commute.direction] = commute
+    if not commutes:
+        commutes = {commute.direction: commute for commute in apartment.commutes if commute.mode == "transit"}
+    return commutes
 
 
 def build_excel(db: Session, user_id: str) -> BytesIO:
     rows = []
+    target = db.query(TargetLocation).filter(TargetLocation.user_id == user_id).first()
+    commute_mode = target.commute_mode if target else "transit"
     apartments = (
         db.query(Apartment)
         .filter(Apartment.user_id == user_id)
@@ -23,7 +32,7 @@ def build_excel(db: Session, user_id: str) -> BytesIO:
         .all()
     )
     for apartment in apartments:
-        commutes = _commute_map(apartment)
+        commutes = _commute_map(apartment, commute_mode)
         morning = commutes.get("morning")
         evening = commutes.get("evening")
         morning_minutes = morning.total_minutes if morning else None
@@ -45,6 +54,7 @@ def build_excel(db: Session, user_id: str) -> BytesIO:
                 "Pet friendly": apartment.pet_friendly,
                 "Overall": float(apartment.overall_score) if apartment.overall_score is not None else None,
                 "Commute": float(apartment.commute_score) if apartment.commute_score is not None else None,
+                "Commute mode": commute_mode,
                 "Walkability": float(apartment.walkability_score) if apartment.walkability_score is not None else None,
                 "Grocery": float(apartment.grocery_score) if apartment.grocery_score is not None else None,
                 "Gym": float(apartment.gym_score) if apartment.gym_score is not None else None,

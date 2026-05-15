@@ -33,12 +33,19 @@ from .scoring import score_apartment
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
-def _upsert_commute(db: Session, apartment: Apartment, direction: str, data: dict) -> None:
-    commute = next((item for item in apartment.commutes if item.direction == direction), None)
+def _normalize_mode(mode: str | None) -> str:
+    mode = (mode or "transit").strip().lower()
+    return mode if mode in {"transit", "car", "cycling", "walking"} else "transit"
+
+
+def _upsert_commute(db: Session, apartment: Apartment, direction: str, mode: str, data: dict) -> None:
+    mode = _normalize_mode(mode)
+    commute = next((item for item in apartment.commutes if item.direction == direction and item.mode == mode), None)
     if commute is None:
-        commute = Commute(apartment_id=apartment.id, direction=direction)
+        commute = Commute(apartment_id=apartment.id, direction=direction, mode=mode)
         db.add(commute)
         apartment.commutes.append(commute)
+    commute.mode = mode
     for key, value in data.items():
         setattr(commute, key, value)
 
@@ -52,6 +59,7 @@ def _current_target(db: Session, user_id: str) -> TargetLocation:
         user_id=user_id,
         label="Office",
         address=settings.bloomberg_address,
+        commute_mode="transit",
         latitude=settings.bloomberg_lat,
         longitude=settings.bloomberg_lon,
     )
@@ -61,7 +69,16 @@ def _current_target(db: Session, user_id: str) -> TargetLocation:
     return target
 
 
-def _apply_scores(apartment: Apartment, scoring_result: dict[str, Any], poi: dict[str, list[dict]]) -> None:
+def _selected_commute(apartment: Apartment, direction: str, mode: str) -> Commute | None:
+    mode = _normalize_mode(mode)
+    return (
+        next((c for c in apartment.commutes if c.direction == direction and c.mode == mode), None)
+        or next((c for c in apartment.commutes if c.direction == direction and c.mode == "transit"), None)
+        or next((c for c in apartment.commutes if c.direction == direction), None)
+    )
+
+
+def _apply_scores(apartment: Apartment, scoring_result: dict[str, Any], poi: dict[str, list[dict]], mode: str) -> None:
     scores = scoring_result["scores"]
     apartment.commute_score = scores.get("commute")
     apartment.gym_score = scores.get("gym")
@@ -82,8 +99,8 @@ def _apply_scores(apartment: Apartment, scoring_result: dict[str, Any], poi: dic
         apartment.poi_snapshot["__errors__"] = poi["__errors__"]
 
     # Denormalized commute minutes for fast sort/filter
-    morning = next((c for c in apartment.commutes if c.direction == "morning"), None)
-    evening = next((c for c in apartment.commutes if c.direction == "evening"), None)
+    morning = _selected_commute(apartment, "morning", mode)
+    evening = _selected_commute(apartment, "evening", mode)
     apartment.commute_minutes_morning = morning.total_minutes if morning else None
     apartment.commute_minutes_evening = evening.total_minutes if evening else None
 
@@ -183,18 +200,33 @@ async def recalculate_apartment(db: Session, apartment: Apartment) -> Apartment:
         # can still be computed.
         message = next((err for err in errors if err.startswith("commute")), "commute calculation failed")
         for direction in ("morning", "evening"):
-            _upsert_commute(db, apartment, direction, {"raw_error": message})
+            _upsert_commute(
+                db,
+                apartment,
+                direction,
+                target.commute_mode,
+                {
+                    "total_minutes": None,
+                    "total_distance_km": None,
+                    "transfers": None,
+                    "walking_minutes": None,
+                    "lines": None,
+                    "estimated_arrival": None,
+                    "route_summary": None,
+                    "raw_error": message,
+                },
+            )
     else:
         for direction, data in commute_data.items():
-            _upsert_commute(db, apartment, direction, data)
+            _upsert_commute(db, apartment, direction, target.commute_mode, data)
 
     poi = poi or {}
-    scoring_result = score_apartment(apartment, poi)
+    scoring_result = score_apartment(apartment, poi, target.commute_mode)
     if poi.get("__errors__"):
         errors.extend([f"places {item.get('category')}: {item.get('error')}" for item in poi["__errors__"]])
     if errors:
         scoring_result["breakdown"]["pipeline_errors"] = errors
-    _apply_scores(apartment, scoring_result, poi)
+    _apply_scores(apartment, scoring_result, poi, target.commute_mode)
 
     db.commit()
     db.refresh(apartment)
@@ -209,8 +241,9 @@ def update_apartment(db: Session, apartment: Apartment, payload: ApartmentUpdate
     # Re-run scoring against cached poi_snapshot so toggling e.g. building_has_gym
     # immediately updates gym_score without a full network re-fetch.
     poi = _reconstruct_poi_from_snapshot(apartment.poi_snapshot)
-    scoring_result = score_apartment(apartment, poi)
-    _apply_scores(apartment, scoring_result, poi)
+    target = _current_target(db, apartment.user_id)
+    scoring_result = score_apartment(apartment, poi, target.commute_mode)
+    _apply_scores(apartment, scoring_result, poi, target.commute_mode)
 
     db.commit()
     db.refresh(apartment)

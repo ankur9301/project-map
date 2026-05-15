@@ -95,7 +95,7 @@ def _extract_route(route: dict, depart_at: datetime) -> dict:
     }
 
 
-def _label_options(options: list[dict]) -> str:
+def _label_options(options: list[dict], travel_mode: str) -> str:
     if not options:
         return ""
 
@@ -108,7 +108,18 @@ def _label_options(options: list[dict]) -> str:
         ),
     )
     option = options[fastest_index]
-    summary = option["route_summary"] or option["lines"] or "Transit route"
+    summary = option["route_summary"] or option["lines"] or "Route"
+    if travel_mode != "TRANSIT":
+        mode_label = {
+            "DRIVE": "Car",
+            "BICYCLE": "Cycling",
+            "WALK": "Walking",
+        }.get(travel_mode, travel_mode.title())
+        return (
+            f"Fastest: {option['total_minutes']} min, "
+            f"{round(option['total_distance_km'] * 0.621371, 1)} mi, "
+            f"{mode_label}. {summary}"
+        )
     return (
         f"Fastest: {option['total_minutes']} min, "
         f"{option['transfers']} transfer(s), {option['walking_minutes']} min walk, "
@@ -182,8 +193,11 @@ async def plan_commute(
         )
     )
     best = options[0]
-    best["route_summary"] = _label_options(options)
+    best["route_summary"] = _label_options(options, travel_mode)
     best["lines"] = best["lines"] if travel_mode == "TRANSIT" else travel_mode.title()
+    if travel_mode != "TRANSIT":
+        best["transfers"] = 0
+        best["walking_minutes"] = best["total_minutes"] if travel_mode == "WALK" else 0
     return best
 
 

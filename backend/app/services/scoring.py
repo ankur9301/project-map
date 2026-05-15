@@ -28,9 +28,22 @@ def _clamp(value: float, low: float = 0.0, high: float = 10.0) -> float:
     return round(max(low, min(high, value)), 1)
 
 
-def _commute_lookup(apartment: Apartment) -> tuple[Any, Any]:
-    commutes = {commute.direction: commute for commute in apartment.commutes}
-    return commutes.get("morning"), commutes.get("evening")
+def _normalize_mode(mode: str | None) -> str:
+    mode = (mode or "transit").strip().lower()
+    return mode if mode in {"transit", "car", "cycling", "walking"} else "transit"
+
+
+def _commute_lookup(apartment: Apartment, mode: str = "transit") -> tuple[Any, Any]:
+    selected = _normalize_mode(mode)
+
+    def find(direction: str) -> Any:
+        return (
+            next((commute for commute in apartment.commutes if commute.direction == direction and commute.mode == selected), None)
+            or next((commute for commute in apartment.commutes if commute.direction == direction and commute.mode == "transit"), None)
+            or next((commute for commute in apartment.commutes if commute.direction == direction), None)
+        )
+
+    return find("morning"), find("evening")
 
 
 def _nearest_minutes_walk(distance_m: float | None, avg_walk_speed_mps: float = 1.3) -> float | None:
@@ -44,10 +57,10 @@ def _nearest_minutes_walk(distance_m: float | None, avg_walk_speed_mps: float = 
 # Commute score (0-10)
 #   shorter round trip = better; fewer transfers = better; less walking = better
 # =============================================================================
-def commute_score(apartment: Apartment) -> ScoreResult:
-    morning, evening = _commute_lookup(apartment)
+def commute_score(apartment: Apartment, mode: str = "transit") -> ScoreResult:
+    morning, evening = _commute_lookup(apartment, mode)
     if not morning or not evening or morning.total_minutes is None or evening.total_minutes is None:
-        return None, {"reason": "commute data pending"}
+        return None, {"reason": "commute data pending", "mode": _normalize_mode(mode)}
 
     round_trip = morning.total_minutes + evening.total_minutes
     avg_transfers = ((morning.transfers or 0) + (evening.transfers or 0)) / 2
@@ -71,6 +84,7 @@ def commute_score(apartment: Apartment) -> ScoreResult:
     score = _clamp(base - transfer_penalty - walk_penalty)
     return score, {
         "round_trip_minutes": round_trip,
+        "mode": _normalize_mode(mode),
         "avg_transfers": round(avg_transfers, 1),
         "total_walking_minutes": walk_min,
         "base_from_round_trip": round(base, 1),
@@ -290,6 +304,7 @@ def daily_friction_score(
     grocery_sub: float | None,
     gym_sub: float | None,
     walkability_sub: float | None,
+    mode: str = "transit",
 ) -> ScoreResult:
     # If a subscore is None (data missing), treat it neutrally at 5/10.
     cs = commute_sub if commute_sub is not None else 5.0
@@ -298,7 +313,7 @@ def daily_friction_score(
     ws = walkability_sub if walkability_sub is not None else 5.0
 
     # Each "10 - sub" contributes proportional friction.
-    morning, evening = _commute_lookup(apartment)
+    morning, evening = _commute_lookup(apartment, mode)
     total_walk = ((morning.walking_minutes if morning else 0) or 0) + ((evening.walking_minutes if evening else 0) or 0)
     avg_transfers = (((morning.transfers if morning else 0) or 0) + ((evening.transfers if evening else 0) or 0)) / 2
 
@@ -318,6 +333,7 @@ def daily_friction_score(
             "grocery": round(10 - gs, 1),
             "gym": round(10 - ys, 1),
         },
+        "mode": _normalize_mode(mode),
         "transfer_term": round(min(avg_transfers, 4) * 0.4, 2),
         "extra_walk_term": round(max(0, total_walk - 30) * 0.05, 2),
         "avg_transfers": round(avg_transfers, 1),
@@ -377,7 +393,7 @@ def overall_score(
 # =============================================================================
 # Convenience: run the whole battery in dependency order.
 # =============================================================================
-def score_apartment(apartment: Apartment, poi: dict[str, list[dict]]) -> dict[str, Any]:
+def score_apartment(apartment: Apartment, poi: dict[str, list[dict]], mode: str = "transit") -> dict[str, Any]:
     """Run every scorer in dependency order. Persists nothing — pure function.
 
     Returns ``{ "scores": {name: value}, "breakdown": {name: dict} }``.
@@ -385,7 +401,7 @@ def score_apartment(apartment: Apartment, poi: dict[str, list[dict]]) -> dict[st
     breakdowns: dict[str, dict] = {}
     scores: dict[str, float | None] = {}
 
-    commute_val, commute_br = commute_score(apartment)
+    commute_val, commute_br = commute_score(apartment, mode)
     scores["commute"] = commute_val
     breakdowns["commute"] = commute_br
 
@@ -413,7 +429,7 @@ def score_apartment(apartment: Apartment, poi: dict[str, list[dict]]) -> dict[st
     scores["lifestyle"] = lifestyle_val
     breakdowns["lifestyle"] = lifestyle_br
 
-    friction_val, friction_br = daily_friction_score(apartment, commute_val, grocery_val, gym_val, walk_val)
+    friction_val, friction_br = daily_friction_score(apartment, commute_val, grocery_val, gym_val, walk_val, mode)
     scores["daily_friction"] = friction_val
     breakdowns["daily_friction"] = friction_br
 

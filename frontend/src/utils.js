@@ -1,10 +1,21 @@
-export function getCommute(apartment, direction) {
-  return apartment.commutes?.find((commute) => commute.direction === direction) || {};
+export function normalizeCommuteMode(mode) {
+  return ["transit", "car", "cycling", "walking"].includes(mode) ? mode : "transit";
 }
 
-export function roundTrip(apartment) {
-  const morning = getCommute(apartment, "morning").total_minutes;
-  const evening = getCommute(apartment, "evening").total_minutes;
+export function getCommute(apartment, direction, mode = "transit") {
+  const selected = normalizeCommuteMode(mode);
+  const commutes = apartment.commutes || [];
+  return (
+    commutes.find((commute) => commute.direction === direction && commute.mode === selected)
+    || commutes.find((commute) => commute.direction === direction && commute.mode === "transit")
+    || commutes.find((commute) => commute.direction === direction)
+    || {}
+  );
+}
+
+export function roundTrip(apartment, mode = "transit") {
+  const morning = getCommute(apartment, "morning", mode).total_minutes;
+  const evening = getCommute(apartment, "evening", mode).total_minutes;
   return Number.isFinite(morning) && Number.isFinite(evening) ? morning + evening : null;
 }
 
