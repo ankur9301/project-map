@@ -152,6 +152,7 @@ class TargetLocation(Base):
     user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, unique=True, index=True)
     label: Mapped[str] = mapped_column(Text, nullable=False, default="Office")
     address: Mapped[str] = mapped_column(Text, nullable=False)
+    commute_mode: Mapped[str] = mapped_column(Text, nullable=False, default="transit")
     latitude: Mapped[float] = mapped_column(Float, nullable=False)
     longitude: Mapped[float] = mapped_column(Float, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

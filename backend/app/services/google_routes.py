@@ -60,6 +60,15 @@ def _step_instruction(step: dict) -> str:
     return f"{mode.title()} ({duration} min)"
 
 
+def _google_travel_mode(mode: str) -> str:
+    return {
+        "transit": "TRANSIT",
+        "car": "DRIVE",
+        "cycling": "BICYCLE",
+        "walking": "WALK",
+    }.get((mode or "transit").strip().lower(), "TRANSIT")
+
+
 def _extract_route(route: dict, depart_at: datetime) -> dict:
     legs = route.get("legs") or []
     steps = [step for leg in legs for step in (leg.get("steps") or [])]
@@ -113,20 +122,23 @@ async def plan_commute(
     to_lat: float,
     to_lon: float,
     depart_at: datetime,
+    mode: str = "transit",
 ) -> dict:
     settings = get_settings()
     if not settings.google_maps_api_key:
         raise GoogleRoutesError("GOOGLE_MAPS_API_KEY is missing from backend/.env.")
 
+    travel_mode = _google_travel_mode(mode)
     body = {
         "origin": {"location": {"latLng": {"latitude": from_lat, "longitude": from_lon}}},
         "destination": {"location": {"latLng": {"latitude": to_lat, "longitude": to_lon}}},
-        "travelMode": "TRANSIT",
-        "departureTime": depart_at.astimezone(UTC).isoformat().replace("+00:00", "Z"),
-        "computeAlternativeRoutes": True,
+        "travelMode": travel_mode,
+        "computeAlternativeRoutes": travel_mode in {"TRANSIT", "DRIVE"},
         "languageCode": "en-US",
         "units": "IMPERIAL",
     }
+    if travel_mode in {"TRANSIT", "DRIVE"}:
+        body["departureTime"] = depart_at.astimezone(UTC).isoformat().replace("+00:00", "Z")
     headers = {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": settings.google_maps_api_key,
@@ -159,7 +171,7 @@ async def plan_commute(
 
     routes = response.json().get("routes") or []
     if not routes:
-        raise GoogleRoutesError("Google Routes returned no transit route for this trip.")
+        raise GoogleRoutesError(f"Google Routes returned no {mode or 'transit'} route for this trip.")
 
     options = [_extract_route(route, depart_at) for route in routes[:3]]
     options.sort(
@@ -171,6 +183,7 @@ async def plan_commute(
     )
     best = options[0]
     best["route_summary"] = _label_options(options)
+    best["lines"] = best["lines"] if travel_mode == "TRANSIT" else travel_mode.title()
     return best
 
 
@@ -188,10 +201,11 @@ async def calculate_both_commutes_to_target(
     home_lon: float,
     target_lat: float,
     target_lon: float,
+    mode: str = "transit",
 ) -> dict[str, dict]:
     settings = get_settings()
     morning_at = _next_monday_at(settings.morning_departure_time)
     evening_at = _next_monday_at(settings.evening_departure_time)
-    morning = await plan_commute(home_lat, home_lon, target_lat, target_lon, morning_at)
-    evening = await plan_commute(target_lat, target_lon, home_lat, home_lon, evening_at)
+    morning = await plan_commute(home_lat, home_lon, target_lat, target_lon, morning_at, mode)
+    evening = await plan_commute(target_lat, target_lon, home_lat, home_lon, evening_at, mode)
     return {"morning": morning, "evening": evening}

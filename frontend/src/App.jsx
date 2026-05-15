@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Download, EyeOff, LayoutGrid, MapPin, Moon, Plus, RefreshCw, Search, SlidersHorizontal, Sun, Trash2 } from "lucide-react";
+import { Bike, Car, Download, EyeOff, Footprints, LayoutGrid, MapPin, Moon, Plus, RefreshCw, Search, SlidersHorizontal, Sun, TrainFront, Trash2 } from "lucide-react";
 import {
   addApartment,
   deleteApartment,
@@ -61,6 +61,13 @@ const DEFAULT_VISIBLE_COLUMNS = [
   "roundTrip",
 ];
 
+const COMMUTE_MODES = [
+  { value: "transit", label: "Transit", Icon: TrainFront },
+  { value: "car", label: "Car", Icon: Car },
+  { value: "cycling", label: "Cycling", Icon: Bike },
+  { value: "walking", label: "Walking", Icon: Footprints },
+];
+
 const COLUMN_STORAGE_KEY = "visibleColumns.v3";
 
 const CARD_SORTS = [
@@ -101,7 +108,7 @@ export default function App() {
   const [sortDirection, setSortDirection] = useState("desc");
   const [viewPanelOpen, setViewPanelOpen] = useState(false);
   const [target, setTarget] = useState(null);
-  const [targetForm, setTargetForm] = useState({ label: "Office", address: "731 Lexington Ave, New York, NY" });
+  const [targetForm, setTargetForm] = useState({ label: "Office", address: "731 Lexington Ave, New York, NY", commute_mode: "transit" });
   const [compareIds, setCompareIds] = useState([]);
   const [visibleColumns, setVisibleColumns] = useState(() => {
     try {
@@ -139,7 +146,7 @@ export default function App() {
     try {
       const data = await getTarget();
       setTarget(data);
-      setTargetForm({ label: data.label || "Office", address: data.address || "" });
+      setTargetForm({ label: data.label || "Office", address: data.address || "", commute_mode: data.commute_mode || "transit" });
     } catch (error) {
       setToast(error.message);
     }
@@ -363,12 +370,16 @@ export default function App() {
         <div>
           <p className="eyebrow">Decision workspace</p>
           <h1>Apartment <em>intelligence.</em></h1>
-          <p className="subtitle">Transit-aware scoring across commute, lifestyle, groceries, and gym access — so you can compare apartments on the things that actually shape daily life.</p>
+          <p className="subtitle">Mode-aware scoring across commute, lifestyle, groceries, and gym access — so you can compare apartments on the things that actually shape daily life.</p>
         </div>
         <div className="heroConsole" aria-label="Tracker status">
           <div>
             <span>Target</span>
             <strong>{target?.label || "Office"}</strong>
+          </div>
+          <div>
+            <span>Mode</span>
+            <strong>{COMMUTE_MODES.find((mode) => mode.value === (target?.commute_mode || "transit"))?.label || "Transit"}</strong>
           </div>
           <div>
             <span>Top overall</span>
@@ -425,7 +436,7 @@ export default function App() {
         <div>
           <p className="eyebrow">Target location</p>
           <h2>{target?.address || "Choose your office or destination"}</h2>
-          <p className="muted">Routes calculate home to target at 7:00 AM, then target back home at 5:30 PM. Changing this rescores every apartment.</p>
+          <p className="muted">Routes calculate with your selected transport mode at 7:00 AM and 5:30 PM. Changing this rescores every apartment.</p>
         </div>
         <form className="targetForm" onSubmit={handleTargetSubmit}>
           <label className="targetInput small">
@@ -436,6 +447,24 @@ export default function App() {
             <span>Address</span>
             <input value={targetForm.address} onChange={(event) => setTargetForm((current) => ({ ...current, address: event.target.value }))} placeholder="Office address" />
           </label>
+          <div className="targetInput modeInput">
+            <span>Mode</span>
+            <div className="modeSegmented" role="radiogroup" aria-label="Commute transport mode">
+              {COMMUTE_MODES.map(({ value, label, Icon }) => (
+                <button
+                  className={targetForm.commute_mode === value ? "selected" : ""}
+                  type="button"
+                  key={value}
+                  role="radio"
+                  aria-checked={targetForm.commute_mode === value}
+                  onClick={() => setTargetForm((current) => ({ ...current, commute_mode: value }))}
+                >
+                  <Icon size={15} />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           <button className="primaryButton" type="submit" disabled={loading || !targetForm.address.trim()}>
             <MapPin size={16} />Save target
           </button>

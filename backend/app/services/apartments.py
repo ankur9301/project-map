@@ -101,7 +101,11 @@ async def _fetch_pipeline_inputs(
 
     async def _commute() -> dict[str, dict]:
         return await calculate_both_commutes_to_target(
-            apartment.latitude, apartment.longitude, target.latitude, target.longitude
+            apartment.latitude,
+            apartment.longitude,
+            target.latitude,
+            target.longitude,
+            target.commute_mode,
         )
 
     async def _places() -> dict[str, list[dict]]:

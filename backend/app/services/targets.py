@@ -17,6 +17,7 @@ def get_target(db: Session, user_id: str) -> TargetLocation:
         user_id=user_id,
         label="Office",
         address=settings.bloomberg_address,
+        commute_mode="transit",
         latitude=settings.bloomberg_lat,
         longitude=settings.bloomberg_lon,
     )
@@ -31,6 +32,7 @@ async def update_target(db: Session, payload: TargetLocationUpdate, user_id: str
     lat, lon = await geocode_address(db, payload.address)
     target.label = payload.label or "Office"
     target.address = payload.address
+    target.commute_mode = payload.commute_mode
     target.latitude = lat
     target.longitude = lon
     db.commit()

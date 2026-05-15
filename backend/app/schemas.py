@@ -138,6 +138,7 @@ class TargetLocationRead(BaseModel):
 
     label: str
     address: str
+    commute_mode: str = "transit"
     latitude: float
     longitude: float
 
@@ -145,3 +146,4 @@ class TargetLocationRead(BaseModel):
 class TargetLocationUpdate(BaseModel):
     label: str | None = Field(default="Office", max_length=200)
     address: str = Field(..., min_length=5, max_length=500)
+    commute_mode: str = Field(default="transit", pattern="^(transit|car|cycling|walking)$")
