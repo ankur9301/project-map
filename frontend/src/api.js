@@ -1,6 +1,7 @@
 import { supabase } from "./supabaseClient";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const ngrokHeaders = API_BASE.includes("ngrok") ? { "ngrok-skip-browser-warning": "1" } : {};
 
 async function authHeaders() {
   if (!supabase) return {};
@@ -12,7 +13,7 @@ async function authHeaders() {
 async function request(path, options = {}) {
   const authorization = await authHeaders();
   const response = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...authorization, ...(options.headers || {}) },
+    headers: { "Content-Type": "application/json", ...ngrokHeaders, ...authorization, ...(options.headers || {}) },
     ...options,
   });
   if (!response.ok) {
@@ -72,7 +73,7 @@ export function exportUrl() {
 
 export async function downloadExport() {
   const authorization = await authHeaders();
-  const response = await fetch(`${API_BASE}/export`, { headers: authorization });
+  const response = await fetch(`${API_BASE}/export`, { headers: { ...ngrokHeaders, ...authorization } });
   if (!response.ok) throw new Error(`Export failed with ${response.status}`);
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);

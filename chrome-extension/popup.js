@@ -38,11 +38,11 @@ document.getElementById("capture").addEventListener("click", async () => {
 });
 
 document.getElementById("connect").addEventListener("click", async () => {
-  status("Reading login from current website tab...");
+  status("Reading login from website tab...");
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    const url = tab.url || "";
-    if (!/^https?:\/\/(localhost|127\.0\.0\.1):5173\//.test(url)) {
+    const tabs = await chrome.tabs.query({ currentWindow: true });
+    const tab = tabs.find((item) => isDashboardUrl(item.url || ""));
+    if (!tab?.id) {
       throw new Error("Open the website dashboard tab first, then click this button.");
     }
     const [{ result }] = await chrome.scripting.executeScript({
@@ -58,6 +58,12 @@ document.getElementById("connect").addEventListener("click", async () => {
   }
 });
 
+function isDashboardUrl(url) {
+  return /^https?:\/\/(localhost|127\.0\.0\.1):5173\//.test(url)
+    || /^https:\/\/project-map-red\.vercel\.app\//.test(url)
+    || /^https:\/\/project-[a-z0-9-]+-ankurgyawali-3633s-projects\.vercel\.app\//.test(url);
+}
+
 saveButton.addEventListener("click", async () => {
   if (!captured?.address) return;
   const apiBase = apiBaseInput.value.trim().replace(/\/$/, "");
@@ -69,6 +75,7 @@ saveButton.addEventListener("click", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...(apiBase.includes("ngrok") ? { "ngrok-skip-browser-warning": "1" } : {}),
         ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       },
       body: JSON.stringify(captured),

@@ -36,7 +36,7 @@ app.add_middleware(
         "https://ankur9301.github.io",
         "https://project-map-red.vercel.app"
     ],
-    allow_origin_regex=r"chrome-extension://.*",
+    allow_origin_regex=r"^(chrome-extension://.*|https://.*\.vercel\.app)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
