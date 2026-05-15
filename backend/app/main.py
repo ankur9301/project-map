@@ -34,7 +34,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "https://ankur9301.github.io",
-        "https://project-map-red.vercel.app/"
+        "https://project-map-red.vercel.app"
     ],
     allow_origin_regex=r"chrome-extension://.*",
     allow_credentials=True,
