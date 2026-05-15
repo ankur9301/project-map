@@ -150,6 +150,8 @@ async def plan_commute(
     }
     if travel_mode in {"TRANSIT", "DRIVE"}:
         body["departureTime"] = depart_at.astimezone(UTC).isoformat().replace("+00:00", "Z")
+    if travel_mode == "DRIVE":
+        body["routingPreference"] = "TRAFFIC_AWARE"
     headers = {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": settings.google_maps_api_key,
