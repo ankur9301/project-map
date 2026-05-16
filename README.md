@@ -20,6 +20,248 @@ Chrome Extension -> FastAPI Backend -> Supabase Postgres -> React Realtime Dashb
 
 The extension never writes directly to Supabase. It sends apartment data to the backend with the user auth token, and the backend writes rows scoped to that user.
 
+## Daily Startup: Docker Backend + Ngrok + Vercel
+
+Use this section when you want the hosted Vercel website to work with the backend running on your laptop.
+
+Important idea:
+
+- Vercel is public.
+- Your Docker backend is local.
+- Ngrok is the public HTTPS bridge between them.
+- If your laptop sleeps, restarts, or ngrok closes, Vercel cannot reach the backend.
+
+Current frontend:
+
+```text
+https://project-map-red.vercel.app
+```
+
+Current backend public tunnel:
+
+```text
+https://dormant-phillis-dominantly.ngrok-free.dev
+```
+
+### 1. Open PowerShell in the Project
+
+```powershell
+cd D:\project_map
+```
+
+### 2. Start Docker Desktop
+
+Open Docker Desktop and wait until it says the engine is running.
+
+Check:
+
+```powershell
+docker ps
+```
+
+If Docker is working, this should print a table, even if no containers are running.
+
+### 3. Build the Backend Image
+
+Run this after code changes, dependency changes, or whenever you are unsure:
+
+```powershell
+docker build -t project-map-backend ./backend
+```
+
+### 4. Start the Backend Container
+
+Stop any old backend container:
+
+```powershell
+docker rm -f apartment-backend
+```
+
+Start the backend using `backend/.env`:
+
+```powershell
+docker run -d --name apartment-backend -p 8000:8000 --env-file backend\.env project-map-backend
+```
+
+Check local health:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health
+```
+
+Expected:
+
+```text
+status : ok
+```
+
+If it fails, inspect logs:
+
+```powershell
+docker logs apartment-backend --tail 100
+```
+
+### 5. Start Ngrok
+
+Ngrok must stay running while friends or Vercel use the app.
+
+```powershell
+ngrok http --url=dormant-phillis-dominantly.ngrok-free.dev 8000
+```
+
+Leave that terminal open.
+
+Check public health in another PowerShell window:
+
+```powershell
+Invoke-RestMethod -Headers @{"ngrok-skip-browser-warning"="1"} https://dormant-phillis-dominantly.ngrok-free.dev/health
+```
+
+Expected:
+
+```text
+status : ok
+```
+
+If you see `ERR_NGROK_3200`, ngrok is offline. Start ngrok again.
+
+### 6. Confirm CORS
+
+Run this if the browser says:
+
+```text
+No Access-Control-Allow-Origin header is present
+```
+
+Check `/target` preflight:
+
+```powershell
+curl.exe -i -X OPTIONS "https://dormant-phillis-dominantly.ngrok-free.dev/target" -H "Origin: https://project-map-red.vercel.app" -H "Access-Control-Request-Method: GET" -H "Access-Control-Request-Headers: authorization,content-type,ngrok-skip-browser-warning" -H "ngrok-skip-browser-warning: 1"
+```
+
+Check `/apartments` preflight:
+
+```powershell
+curl.exe -i -X OPTIONS "https://dormant-phillis-dominantly.ngrok-free.dev/apartments" -H "Origin: https://project-map-red.vercel.app" -H "Access-Control-Request-Method: GET" -H "Access-Control-Request-Headers: authorization,content-type,ngrok-skip-browser-warning" -H "ngrok-skip-browser-warning: 1"
+```
+
+Expected headers:
+
+```text
+HTTP/1.1 200 OK
+Access-Control-Allow-Origin: https://project-map-red.vercel.app
+```
+
+If ngrok health works but CORS fails, check `backend/.env` has the Vercel URL in `CORS_ORIGINS`, then restart Docker:
+
+```text
+CORS_ORIGINS=https://project-map-red.vercel.app,http://localhost:5173,http://127.0.0.1:5173
+```
+
+Restart:
+
+```powershell
+docker rm -f apartment-backend
+docker run -d --name apartment-backend -p 8000:8000 --env-file backend\.env project-map-backend
+```
+
+### 7. Open the Website
+
+Open:
+
+```text
+https://project-map-red.vercel.app
+```
+
+Hard refresh:
+
+```text
+Ctrl + Shift + R
+```
+
+Then test:
+
+- Sign in
+- Load apartments
+- Load target
+- Change commute mode
+- Click `Save target`
+- Click `Recalculate shown`
+
+### 8. Chrome Extension
+
+Use the unpacked extension from:
+
+```text
+D:\project_map\chrome-extension
+```
+
+If the extension cannot connect:
+
+1. Open the Vercel dashboard tab first.
+2. Sign in.
+3. Click `Copy extension token` on the website, or click `Connect from website tab` in the extension.
+4. Make sure the extension API URL is:
+
+```text
+https://dormant-phillis-dominantly.ngrok-free.dev
+```
+
+Not:
+
+```text
+http://127.0.0.1:8000
+```
+
+Use the local URL only when the website itself is running locally.
+
+### Daily Troubleshooting
+
+If Vercel worked yesterday but not today:
+
+1. Check Docker:
+
+```powershell
+docker ps --filter name=apartment-backend
+```
+
+2. Check local backend:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health
+```
+
+3. Check ngrok:
+
+```powershell
+Invoke-RestMethod -Headers @{"ngrok-skip-browser-warning"="1"} https://dormant-phillis-dominantly.ngrok-free.dev/health
+```
+
+4. If ngrok is offline, restart it:
+
+```powershell
+ngrok http --url=dormant-phillis-dominantly.ngrok-free.dev 8000
+```
+
+5. Hard refresh Vercel:
+
+```text
+Ctrl + Shift + R
+```
+
+Most “CORS” errors in this setup are actually ngrok being offline.
+
+### Better Long-Term Setup
+
+Ngrok is fine for testing with friends, but it depends on your laptop staying awake.
+
+For a stable app:
+
+- Keep Vercel for the frontend.
+- Deploy the Docker backend to Render, Railway, Fly.io, or a VPS.
+- Keep Supabase as the database and auth provider.
+- Set Vercel `VITE_API_BASE_URL` to the real deployed backend URL.
+
 ## Required Environment
 
 Backend: `backend/.env`
